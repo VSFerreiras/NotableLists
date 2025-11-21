@@ -11,6 +11,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ucne.edu.notablelists.ui.theme.NotableListsTheme
 
 @Composable
@@ -18,8 +19,12 @@ fun ProfileScreen(
     onNavigateToLogin: () -> Unit,
     viewModel: UserViewModel = hiltViewModel()
 ) {
-    val state = viewModel.state.collectAsState().value
-    Log.e("ProfileScreen", "currentUser = ${state.currentUser}")
+    val state by viewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        Log.d("ProfileScreen", "currentUser = ${state.currentUser}")
+    }
+
 
     Column(
         modifier = Modifier
@@ -54,7 +59,7 @@ fun ProfileScreen(
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "Bienvenido, ${state.currentUser}",
+            text = "Bienvenido, ${state.currentUser ?: "Usuario"}",
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -81,7 +86,8 @@ fun ProfileScreen(
 fun PreviewProfileScreen() {
     NotableListsTheme {
         ProfileScreen(
-            onNavigateToLogin = {}
+            onNavigateToLogin = {},
+            viewModel = hiltViewModel()
         )
     }
 }
