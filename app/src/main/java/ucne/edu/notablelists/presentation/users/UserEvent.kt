@@ -1,9 +1,11 @@
 package ucne.edu.notablelists.presentation.users
 
-sealed class UserEvent {
-    object CreateUser : UserEvent()
-    object LoginUser : UserEvent()
-    object Logout : UserEvent()
-    object ClearError : UserEvent()
-    object ClearSuccess : UserEvent()
+sealed interface UserEvent {
+    data object CreateUser : UserEvent
+    data object LoginUser : UserEvent
+    data object Logout : UserEvent
+    data object ClearError : UserEvent
+    data object ClearSuccess : UserEvent
+    data class UserNameChanged(val value: String) : UserEvent
+    data class PasswordChanged(val value: String) : UserEvent
 }
