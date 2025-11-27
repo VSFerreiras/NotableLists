@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import ucne.edu.notablelists.domain.users.usecase.PostUserUseCase
 import ucne.edu.notablelists.domain.users.usecase.ValidateUserUseCase
 import javax.inject.Inject
+import ucne.edu.notablelists.data.remote.Resource
 
 @HiltViewModel
 class UserViewModel @Inject constructor(
@@ -27,10 +28,12 @@ class UserViewModel @Inject constructor(
             UserEvent.Logout -> logout()
             UserEvent.ClearError -> clearError()
             UserEvent.ClearSuccess -> clearSuccess()
+            is UserEvent.UserNameChanged -> userNameChanged(event.value)
+            is UserEvent.PasswordChanged -> passwordChanged(event.value)
         }
     }
 
-    fun updateUsername(username: String) {
+    private fun userNameChanged(username: String) {
         _state.update {
             it.copy(
                 username = username,
@@ -40,7 +43,7 @@ class UserViewModel @Inject constructor(
         }
     }
 
-    fun updatePassword(password: String) {
+    fun passwordChanged(password: String) {
         _state.update {
             it.copy(
                 password = password,
@@ -55,7 +58,7 @@ class UserViewModel @Inject constructor(
         val password = _state.value.password
 
         val validation = validateUseCase(username, password)
-        if (validation is ucne.edu.notablelists.data.remote.Resource.Error) {
+        if (validation is Resource.Error) {
             setFieldErrors(validation.message)
             return
         }
@@ -66,7 +69,7 @@ class UserViewModel @Inject constructor(
             try {
                 val result = postUserUseCase(username, password)
                 when (result) {
-                    is ucne.edu.notablelists.data.remote.Resource.Success -> {
+                    is Resource.Success -> {
                         _state.update {
                             it.copy(
                                 isLoading = false,
@@ -80,10 +83,10 @@ class UserViewModel @Inject constructor(
                             )
                         }
                     }
-                    is ucne.edu.notablelists.data.remote.Resource.Error -> {
+                    is Resource.Error -> {
                         setFieldErrors(result.message)
                     }
-                    is ucne.edu.notablelists.data.remote.Resource.Loading -> {
+                    is Resource.Loading -> {
                         _state.update { it.copy(isLoading = true) }
                     }
                 }
@@ -103,7 +106,7 @@ class UserViewModel @Inject constructor(
         val password = _state.value.password
 
         val validation = validateUseCase(username, password)
-        if (validation is ucne.edu.notablelists.data.remote.Resource.Error) {
+        if (validation is Resource.Error) {
             setFieldErrors(validation.message)
             return
         }

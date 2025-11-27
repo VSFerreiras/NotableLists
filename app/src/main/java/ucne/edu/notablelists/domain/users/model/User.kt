@@ -6,6 +6,5 @@ data class User(
     val id: String = UUID.randomUUID().toString(),
     val remoteId: Int? = null,
     val username: String,
-    val password: String,
-    val isPendingCreate: Boolean = false
+    val password: String
 )

@@ -19,12 +19,6 @@ class UserRepositoryImpl @Inject constructor(
         return localDataSource.getUser(id)?.toDomain()
     }
 
-    override suspend fun createUserLocal(user: User): Resource<User> {
-        val pending = user.copy(isPendingCreate = true)
-        localDataSource.upsert(pending.toEntity())
-        return Resource.Success(pending)
-    }
-
     override suspend fun upsertUser(user: User): Resource<Unit> {
         val remoteId = user.remoteId ?: return Resource.Error("No remoteId")
         val request = UserRequestDto(user.username, user.password)
@@ -75,7 +69,6 @@ class UserRepositoryImpl @Inject constructor(
             val remoteUser = result.data!!
             user.copy(
                 remoteId = remoteUser.userId,
-                isPendingCreate = false
             )
         } else {
             throw Exception("Failed to create user on server")
@@ -88,7 +81,7 @@ class UserRepositoryImpl @Inject constructor(
         val result = remoteDataSource.updateUser(remoteId, request)
 
         return if (result is Resource.Success) {
-            user.copy(isPendingCreate = false)
+            user.copy()
         } else {
             throw Exception("Failed to update user on server")
         }

@@ -19,6 +19,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ucne.edu.notablelists.ui.theme.NotableListsTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,13 +29,22 @@ fun LoginScreen(
     onNavigateToProfile: () -> Unit,
     viewModel: UserViewModel = hiltViewModel()
 ) {
-    val state = viewModel.state.collectAsState().value
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(state.isSuccess) {
-        if (state.isSuccess) {
-            onNavigateToProfile()
-            viewModel.onEvent(UserEvent.ClearSuccess)
+        state.isSuccess?.let { success ->
+            if (success) {
+                onNavigateToProfile()
+                viewModel.onEvent(UserEvent.ClearSuccess)
+            }
+        }
+    }
+
+    LaunchedEffect(state.error) {
+        state.error?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.onEvent(UserEvent.ClearError)
         }
     }
 
@@ -116,9 +126,9 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            if (state.usernameError != null) {
+            state.usernameError?.let { error ->
                 Text(
-                    text = state.usernameError,
+                    text = error,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -126,7 +136,7 @@ fun LoginScreen(
 
             TextField(
                 value = state.username,
-                onValueChange = viewModel::updateUsername,
+                onValueChange = { viewModel.onEvent(UserEvent.UserNameChanged(it)) },
                 label = { Text("Usuario") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -136,9 +146,9 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (state.passwordError != null) {
+            state.passwordError?.let { error ->
                 Text(
-                    text = state.passwordError,
+                    text = error,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -146,7 +156,7 @@ fun LoginScreen(
 
             TextField(
                 value = state.password,
-                onValueChange = viewModel::updatePassword,
+                onValueChange = { viewModel.onEvent(UserEvent.PasswordChanged(it)) },
                 label = { Text("Contraseña") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -164,7 +174,10 @@ fun LoginScreen(
                 enabled = !state.isLoading
             ) {
                 if (state.isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.height(16.dp))
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
                 } else {
                     Text("Iniciar Sesión")
                 }
@@ -190,7 +203,8 @@ fun PreviewLoginScreen() {
     NotableListsTheme {
         LoginScreen(
             onNavigateToRegister = {},
-            onNavigateToProfile = {}
+            onNavigateToProfile = {},
+            viewModel = hiltViewModel()
         )
     }
 }

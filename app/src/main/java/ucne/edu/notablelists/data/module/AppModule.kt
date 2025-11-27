@@ -12,10 +12,15 @@ import dagger.hilt.components.SingletonComponent
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import ucne.edu.notablelists.data.db.NotableListDB
+import ucne.edu.notablelists.data.local.Notes.NoteDao
 import ucne.edu.notablelists.data.local.Users.UserDao
+import ucne.edu.notablelists.data.remote.DataSource.NoteRemoteDataSource
 import ucne.edu.notablelists.data.remote.DataSource.UserRemoteDataSource
+import ucne.edu.notablelists.data.remote.NoteApiService
 import ucne.edu.notablelists.data.remote.UserApiService
+import ucne.edu.notablelists.data.repository.NoteRepositoryImpl
 import ucne.edu.notablelists.data.repository.UserRepositoryImpl
+import ucne.edu.notablelists.domain.notes.repository.NoteRepository
 import ucne.edu.notablelists.domain.users.repository.UserRepository
 import javax.inject.Singleton
 
@@ -45,6 +50,12 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideNoteDao(notableListDB: NotableListDB): NoteDao {
+        return notableListDB.noteDao()
+    }
+
+    @Provides
+    @Singleton
     fun provideMoshi(): Moshi {
         return Moshi.Builder()
             .add(KotlinJsonAdapterFactory())
@@ -63,7 +74,23 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideNoteApi(moshi: Moshi): NoteApiService {
+        return Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(NoteApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
     fun provideUserRepository(userDao: UserDao, remoteDataSource: UserRemoteDataSource): UserRepository {
         return UserRepositoryImpl(userDao, remoteDataSource)
+    }
+
+    @Provides
+    @Singleton
+    fun provideNoteRepository(noteDao: NoteDao, remoteDataSource: NoteRemoteDataSource): NoteRepository {
+        return NoteRepositoryImpl(noteDao, remoteDataSource)
     }
 }

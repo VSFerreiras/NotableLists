@@ -22,7 +22,9 @@ class PostUserUseCase @Inject constructor(
                     Resource.Error("Error al crear usuario: ${e.message}")
                 }
             }
-            else -> Resource.Error("Error inesperado")
+            is Resource.Loading -> {
+                Resource.Error("Validación en progreso, intente nuevamente")
+            }
         }
     }
 }
