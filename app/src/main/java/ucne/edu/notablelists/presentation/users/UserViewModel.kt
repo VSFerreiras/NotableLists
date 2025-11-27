@@ -11,11 +11,13 @@ import ucne.edu.notablelists.domain.users.usecase.PostUserUseCase
 import ucne.edu.notablelists.domain.users.usecase.ValidateUserUseCase
 import javax.inject.Inject
 import ucne.edu.notablelists.data.remote.Resource
+import ucne.edu.notablelists.domain.auth.AuthRepository
 
 @HiltViewModel
 class UserViewModel @Inject constructor(
     private val postUserUseCase: PostUserUseCase,
-    private val validateUseCase: ValidateUserUseCase
+    private val validateUseCase: ValidateUserUseCase,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(UserState())
@@ -115,17 +117,32 @@ class UserViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                _state.update {
-                    it.copy(
-                        isLoading = false,
-                        isSuccess = true,
-                        error = null,
-                        usernameError = null,
-                        passwordError = null,
-                        username = "",
-                        password = "",
-                        currentUser = username
-                    )
+                val result = authRepository.login(username, password)
+                when (result) {
+                    is Resource.Success -> {
+                        _state.update {
+                            it.copy(
+                                isLoading = false,
+                                isSuccess = true,
+                                error = null,
+                                usernameError = null,
+                                passwordError = null,
+                                username = "",
+                                password = "",
+                                currentUser = username
+                            )
+                        }
+                    }
+                    is Resource.Error -> {
+                        _state.update {
+                            it.copy(
+                                isLoading = false,
+                                error = result.message
+                            )
+                        }
+                    }
+                    is Resource.Loading -> {
+                    }
                 }
             } catch (e: Exception) {
                 _state.update {
