@@ -48,6 +48,31 @@ fun RegisterScreen(
         }
     }
 
+    if (state.showSkipDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.onEvent(UserEvent.DismissSkipDialog) },
+            title = { Text("¿Estás seguro?") },
+            text = { Text("Si usas la aplicación sin iniciar sesión podrías perder tus notas") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.onEvent(UserEvent.DismissSkipDialog)
+                        onNavigateToProfile()
+                    }
+                ) {
+                    Text("Omitir")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.onEvent(UserEvent.DismissSkipDialog) }
+                ) {
+                    Text("Registrarse")
+                }
+            }
+        )
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -192,6 +217,24 @@ fun RegisterScreen(
             ) {
                 Text("¿Ya tienes cuenta? Inicia Sesión")
             }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start
+            ) {
+                TextButton(
+                    onClick = { viewModel.onEvent(UserEvent.ShowSkipDialog) },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("Omitir")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

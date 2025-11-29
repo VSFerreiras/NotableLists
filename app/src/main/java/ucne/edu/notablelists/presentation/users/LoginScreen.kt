@@ -32,6 +32,12 @@ fun LoginScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    LaunchedEffect(state.currentUser) {
+        if (state.currentUser.isNotBlank()) {
+            onNavigateToProfile()
+        }
+    }
+
     LaunchedEffect(state.isSuccess) {
         state.isSuccess?.let { success ->
             if (success) {
@@ -48,12 +54,36 @@ fun LoginScreen(
         }
     }
 
+    if (state.showSkipDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.onEvent(UserEvent.DismissSkipDialog) },
+            title = { Text("¿Estás seguro?") },
+            text = { Text("Si usas la aplicación sin iniciar sesión podrías perder tus notas") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.onEvent(UserEvent.DismissSkipDialog)
+                        onNavigateToProfile()
+                    }
+                ) {
+                    Text("Omitir")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.onEvent(UserEvent.DismissSkipDialog) }
+                ) {
+                    Text("Iniciar sesión")
+                }
+            }
+        )
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                windowInsets = WindowInsets(0),
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically
@@ -193,6 +223,24 @@ fun LoginScreen(
             ) {
                 Text("¿No tienes cuenta? Regístrate")
             }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start
+            ) {
+                TextButton(
+                    onClick = { viewModel.onEvent(UserEvent.ShowSkipDialog) },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("Omitir")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
