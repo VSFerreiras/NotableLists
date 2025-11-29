@@ -7,21 +7,40 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import ucne.edu.notablelists.data.remote.Resource
+import ucne.edu.notablelists.domain.auth.AuthRepository
+import ucne.edu.notablelists.domain.session.usecase.ClearSessionUseCase
+import ucne.edu.notablelists.domain.session.usecase.GetSessionUseCase
+import ucne.edu.notablelists.domain.session.usecase.SaveSessionUseCase
 import ucne.edu.notablelists.domain.users.usecase.PostUserUseCase
 import ucne.edu.notablelists.domain.users.usecase.ValidateUserUseCase
 import javax.inject.Inject
-import ucne.edu.notablelists.data.remote.Resource
-import ucne.edu.notablelists.domain.auth.AuthRepository
 
 @HiltViewModel
 class UserViewModel @Inject constructor(
     private val postUserUseCase: PostUserUseCase,
     private val validateUseCase: ValidateUserUseCase,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val getSessionUseCase: GetSessionUseCase,
+    private val saveSessionUseCase: SaveSessionUseCase,
+    private val clearSessionUseCase: ClearSessionUseCase
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(UserState())
     val state: StateFlow<UserState> = _state
+
+    init {
+        viewModelScope.launch {
+            getSessionUseCase().collect { user ->
+                _state.update {
+                    it.copy(
+                        currentUser = user ?: "",
+                        isSessionChecked = true
+                    )
+                }
+            }
+        }
+    }
 
     fun onEvent(event: UserEvent) {
         when (event) {
@@ -32,6 +51,8 @@ class UserViewModel @Inject constructor(
             UserEvent.ClearSuccess -> clearSuccess()
             is UserEvent.UserNameChanged -> userNameChanged(event.value)
             is UserEvent.PasswordChanged -> passwordChanged(event.value)
+            UserEvent.ShowSkipDialog -> _state.update { it.copy(showSkipDialog = true) }
+            UserEvent.DismissSkipDialog -> _state.update { it.copy(showSkipDialog = false) }
         }
     }
 
@@ -72,6 +93,7 @@ class UserViewModel @Inject constructor(
                 val result = postUserUseCase(username, password)
                 when (result) {
                     is Resource.Success -> {
+                        saveSessionUseCase(username)
                         _state.update {
                             it.copy(
                                 isLoading = false,
@@ -120,6 +142,7 @@ class UserViewModel @Inject constructor(
                 val result = authRepository.login(username, password)
                 when (result) {
                     is Resource.Success -> {
+                        saveSessionUseCase(username)
                         _state.update {
                             it.copy(
                                 isLoading = false,
@@ -191,12 +214,16 @@ class UserViewModel @Inject constructor(
     }
 
     private fun logout() {
-        _state.update {
-            UserState(
-                username = "",
-                password = "",
-                currentUser = ""
-            )
+        viewModelScope.launch {
+            clearSessionUseCase()
+            _state.update {
+                UserState(
+                    username = "",
+                    password = "",
+                    currentUser = "",
+                    isSessionChecked = true
+                )
+            }
         }
     }
 
