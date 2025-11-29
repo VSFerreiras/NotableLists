@@ -138,19 +138,25 @@ class NoteEditViewModel @Inject constructor(
 
             when (val result = upsertNoteUseCase(note)) {
                 is Resource.Success -> {
-                    try {
-                        if (note.remoteId == null) {
-                            postNoteUseCase(note)
-                        } else {
-                            putNoteUseCase(note)
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
+                    val apiResult = if (note.remoteId == null) {
+                        postNoteUseCase(note)
+                    } else {
+                        putNoteUseCase(note)
                     }
 
-                    triggerSyncUseCase()
-                    _state.update { it.copy(isLoading = false) }
-                    sendUiEvent(NoteEditUiEvent.NavigateBack)
+                    when (apiResult) {
+                        is Resource.Success -> {
+                            triggerSyncUseCase()
+                            _state.update { it.copy(isLoading = false) }
+                            sendUiEvent(NoteEditUiEvent.NavigateBack)
+                        }
+                        is Resource.Error -> {
+                            _state.update { it.copy(errorMessage = apiResult.message, isLoading = false) }
+                        }
+                        is Resource.Loading -> {
+                            _state.update { it.copy(isLoading = true) }
+                        }
+                    }
                 }
                 is Resource.Error -> {
                     _state.update { it.copy(errorMessage = result.message, isLoading = false) }
