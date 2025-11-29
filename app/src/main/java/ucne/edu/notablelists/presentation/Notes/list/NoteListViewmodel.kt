@@ -25,6 +25,7 @@ class NotesListViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     private val _isRefreshing = MutableStateFlow(false)
     private val _navigationEvent = MutableStateFlow<List<String?>>(emptyList())
+    private val _showLogoutDialog = MutableStateFlow(false)
 
     private val _filterState = combine(_searchQuery, _selectedFilter) { query, filter ->
         Pair(query, filter)
@@ -38,8 +39,9 @@ class NotesListViewModel @Inject constructor(
         _rawNotes,
         _filterState,
         _uiStatusState,
-        _navigationEvent
-    ) { notes, (query, selectedFilter), (isLoading, errorMessage, _), navEvent ->
+        _navigationEvent,
+        _showLogoutDialog
+    ) { notes, (query, selectedFilter), (isLoading, errorMessage, _), navEvent, showDialog ->
 
         val filteredNotes = filterAndSortNotes(notes, query, selectedFilter)
 
@@ -62,7 +64,8 @@ class NotesListViewModel @Inject constructor(
             loadingStatus = loadingList,
             errorMessage = errorList,
             navigateToDetail = navEvent,
-            searchQuery = query
+            searchQuery = query,
+            showLogoutDialog = showDialog
         )
     }.stateIn(
         viewModelScope,
@@ -84,6 +87,8 @@ class NotesListViewModel @Inject constructor(
             is NotesListEvent.OnSearchQueryChange -> _searchQuery.value = event.query
             is NotesListEvent.OnFilterChange -> _selectedFilter.value = event.filter
             is NotesListEvent.OnNavigationHandled -> _navigationEvent.value = emptyList()
+            is NotesListEvent.OnShowLogoutDialog -> _showLogoutDialog.value = true
+            is NotesListEvent.OnDismissLogoutDialog -> _showLogoutDialog.value = false
         }
     }
 
