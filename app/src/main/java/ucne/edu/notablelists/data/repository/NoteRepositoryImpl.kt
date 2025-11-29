@@ -38,25 +38,6 @@ class NoteRepositoryImpl @Inject constructor(
             val isNew = note.remoteId == null
             val entity = note.toEntity().copy(isPendingCreate = isNew)
             localDataSource.upsert(entity)
-
-            if (!isNew) {
-                try {
-                    val request = NoteRequestDto(
-                        title = note.title,
-                        description = note.description,
-                        tag = note.tag,
-                        isFinished = note.isFinished,
-                        reminder = note.reminder?: "",
-                        checklist = note.checklist?: "",
-                        priority = note.priority,
-                        deleteAt = note.deleteAt?: "",
-                        autoDelete = note.autoDelete
-                    )
-                    remoteDataSource.updateNote(note.remoteId!!, request)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
             Resource.Success(Unit)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Error desconocido al guardar localmente")
@@ -79,6 +60,19 @@ class NoteRepositoryImpl @Inject constructor(
             Resource.Success(Unit)
         } catch (e: Exception) {
             Resource.Error(e.message ?: "Error al eliminar")
+        }
+    }
+
+    override suspend fun deleteRemote(id: Int): Resource<Unit> {
+        return try {
+            val result = remoteDataSource.deleteNote(id)
+            if (result is Resource.Success) {
+                Resource.Success(Unit)
+            } else {
+                Resource.Error(result.message ?: "No se pudo eliminar en el servidor")
+            }
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Error de red al eliminar")
         }
     }
 
@@ -136,16 +130,16 @@ class NoteRepositoryImpl @Inject constructor(
                         val updatedNote = note.copy(remoteId = remoteNote.noteId)
                         Resource.Success(updatedNote)
                     } else {
-                        Resource.Error("Empty response from server")
+                        Resource.Error("Respuesta vacía del servidor")
                     }
                 }
                 is Resource.Error -> {
-                    Resource.Error(result.message ?: "Unknown API error")
+                    Resource.Error(result.message ?: "Error desconocido de API")
                 }
-                else -> Resource.Error("Unexpected result")
+                else -> Resource.Error("Resultado inesperado")
             }
         } catch (e: Exception) {
-            Resource.Error("Network error: ${e.message}")
+            Resource.Error("Error de red: ${e.message}")
         }
     }
 
@@ -168,7 +162,7 @@ class NoteRepositoryImpl @Inject constructor(
             if (result is Resource.Success) {
                 Resource.Success(note)
             } else {
-                Resource.Error("Failed to update note on server")
+                Resource.Error(result.message ?: "Failed to update note on server")
             }
         } catch (e: Exception) {
             Resource.Error("Failed to update note: ${e.message}")
