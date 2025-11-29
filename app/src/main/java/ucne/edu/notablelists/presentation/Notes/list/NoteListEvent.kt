@@ -11,6 +11,8 @@ sealed interface NotesListEvent {
     data class OnSearchQueryChange(val query: String) : NotesListEvent
     data class OnFilterChange(val filter: NoteFilter) : NotesListEvent
     data object OnNavigationHandled : NotesListEvent
+    data object OnShowLogoutDialog : NotesListEvent
+    data object OnDismissLogoutDialog : NotesListEvent
 }
 
 enum class NoteFilter(val label: String) {

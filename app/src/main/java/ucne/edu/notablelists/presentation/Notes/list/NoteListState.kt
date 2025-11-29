@@ -1,6 +1,6 @@
 package ucne.edu.notablelists.presentation.Notes.list
 
-import ucne.edu.notablelists.domain.notes.model.Note
+import androidx.compose.ui.graphics.Color
 
 data class NotesListState(
     val loadingStatus: List<Unit> = emptyList(),
@@ -8,7 +8,8 @@ data class NotesListState(
     val filterChips: List<FilterUiItem> = emptyList(),
     val errorMessage: List<String> = emptyList(),
     val navigateToDetail: List<String?> = emptyList(),
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    val showLogoutDialog: Boolean = false
 )
 
 enum class NoteStyle {

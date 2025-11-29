@@ -11,5 +11,7 @@ data class UserState(
     val error: String? = null,
     val isSuccess: Boolean = false,
     val usernameError: String? = null,
-    val passwordError: String? = null
+    val passwordError: String? = null,
+    val showSkipDialog: Boolean = false,
+    val isSessionChecked: Boolean = false
 )
