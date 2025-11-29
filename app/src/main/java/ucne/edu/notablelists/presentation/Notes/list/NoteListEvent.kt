@@ -8,4 +8,16 @@ sealed interface NotesListEvent {
     data class ToggleNoteFinished(val note: Note) : NotesListEvent
     data class OnNoteClick(val id: String) : NotesListEvent
     data object OnAddNoteClick : NotesListEvent
+    data class OnSearchQueryChange(val query: String) : NotesListEvent
+    data class OnFilterChange(val filter: NoteFilter) : NotesListEvent
+    data object OnNavigationHandled : NotesListEvent
+}
+
+enum class NoteFilter(val label: String) {
+    AZ("A-Z"),
+    ZA("Z-A"),
+    DATE("Fecha"),
+    HIGH_PRIORITY("Alta"),
+    MEDIUM_PRIORITY("Media"),
+    LOW_PRIORITY("Baja")
 }
