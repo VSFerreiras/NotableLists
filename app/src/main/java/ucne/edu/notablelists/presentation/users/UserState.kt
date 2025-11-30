@@ -7,6 +7,7 @@ data class UserState(
     val username: String = "",
     val password: String = "",
     val currentUser: String = "",
+    val currentUserId: Int? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
     val isSuccess: Boolean = false,
