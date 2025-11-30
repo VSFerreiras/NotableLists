@@ -17,6 +17,7 @@ class NotesListViewModel @Inject constructor(
     private val deleteNoteUseCase: DeleteNoteUseCase,
     private val upsertNoteUseCase: UpsertNoteUseCase,
     private val getUserIdUseCase: GetUserIdUseCase,
+    private val fetchUserNotesUseCase: FetchUserNotesUseCase,
     private val postPendingNotesUseCase: PostPendingNotesUseCase
 ) : ViewModel() {
 
@@ -185,6 +186,7 @@ class NotesListViewModel @Inject constructor(
             _isRefreshing.value = true
             val userId = getUserIdUseCase().first()
             if (userId != null) {
+                fetchUserNotesUseCase(userId)
                 val result = postPendingNotesUseCase(userId)
                 if (result is Resource.Error) {
                     _errorMessage.value = result.message
