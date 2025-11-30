@@ -9,6 +9,7 @@ data class NoteEntity (
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val remoteId: Int? = null,
     val title: String,
+    val userId: Int? = null,
     val description: String,
     val tag: String,
     val isFinished: Boolean = false,
