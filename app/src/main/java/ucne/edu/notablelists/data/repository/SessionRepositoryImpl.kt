@@ -9,9 +9,10 @@ class SessionRepositoryImpl @Inject constructor(
 ) : SessionRepository {
 
     override fun getUserSession() = sessionManager.getUser()
+    override fun getUserId() = sessionManager.getUserId()
 
-    override suspend fun saveUserSession(username: String) {
-        sessionManager.saveUser(username)
+    override suspend fun saveUserSession(userId: Int, username: String) {
+        sessionManager.saveUser(userId,username)
     }
 
     override suspend fun clearUserSession() {
