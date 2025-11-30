@@ -1,5 +1,6 @@
 package ucne.edu.notablelists.presentation.users
 
+import ucne.edu.notablelists.domain.session.usecase.GetUserIdUseCase
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -9,6 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ucne.edu.notablelists.data.remote.Resource
 import ucne.edu.notablelists.domain.auth.AuthRepository
+import ucne.edu.notablelists.domain.notes.repository.NoteRepository
 import ucne.edu.notablelists.domain.session.usecase.ClearSessionUseCase
 import ucne.edu.notablelists.domain.session.usecase.GetSessionUseCase
 import ucne.edu.notablelists.domain.session.usecase.SaveSessionUseCase
@@ -23,6 +25,8 @@ class UserViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val getSessionUseCase: GetSessionUseCase,
     private val saveSessionUseCase: SaveSessionUseCase,
+    private val noteRepository: NoteRepository, // ← Add this for sync
+    private val getUserIdUseCase: GetUserIdUseCase,
     private val clearSessionUseCase: ClearSessionUseCase
 ) : ViewModel() {
 
@@ -93,7 +97,12 @@ class UserViewModel @Inject constructor(
                 val result = postUserUseCase(username, password)
                 when (result) {
                     is Resource.Success -> {
-                        saveSessionUseCase(username)
+                        val newUser = result.data
+                        val userId = newUser?.remoteId
+                        if (userId != null) {
+                            saveSessionUseCase(userId, username)
+                            noteRepository.syncOnLogin(userId)
+                        }
                         _state.update {
                             it.copy(
                                 isLoading = false,
@@ -103,7 +112,8 @@ class UserViewModel @Inject constructor(
                                 passwordError = null,
                                 username = "",
                                 password = "",
-                                currentUser = username
+                                currentUser = username,
+                                currentUserId = userId
                             )
                         }
                     }
@@ -142,7 +152,12 @@ class UserViewModel @Inject constructor(
                 val result = authRepository.login(username, password)
                 when (result) {
                     is Resource.Success -> {
-                        saveSessionUseCase(username)
+                        val loggedInUser = result.data
+                        val userId = loggedInUser?.remoteId
+                        if (userId != null) {
+                            saveSessionUseCase(userId, username)
+                            noteRepository.syncOnLogin(userId)
+                        }
                         _state.update {
                             it.copy(
                                 isLoading = false,
@@ -152,7 +167,8 @@ class UserViewModel @Inject constructor(
                                 passwordError = null,
                                 username = "",
                                 password = "",
-                                currentUser = username
+                                currentUser = username,
+                                currentUserId = userId
                             )
                         }
                     }
@@ -221,6 +237,7 @@ class UserViewModel @Inject constructor(
                     username = "",
                     password = "",
                     currentUser = "",
+                    currentUserId = null,
                     isSessionChecked = true
                 )
             }
