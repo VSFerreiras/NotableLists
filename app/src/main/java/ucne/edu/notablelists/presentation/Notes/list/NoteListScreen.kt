@@ -1,25 +1,59 @@
 package ucne.edu.notablelists.presentation.notes_list
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ExitToApp
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -34,7 +68,8 @@ fun NotesListRoute(
     viewModel: NotesListViewModel = hiltViewModel(),
     userViewModel: UserViewModel = hiltViewModel(),
     onNavigateToDetail: (String?) -> Unit,
-    onNavigateToLogin: () -> Unit
+    onNavigateToLogin: () -> Unit,
+    onNavigateToFriends: () -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val userState by userViewModel.state.collectAsStateWithLifecycle()
@@ -46,24 +81,46 @@ fun NotesListRoute(
         }
     }
 
+    BackHandler(enabled = state.isSelectionMode) {
+        viewModel.onEvent(NotesListEvent.OnClearSelection)
+    }
+
     NotesListScreen(
         state = state,
         userState = userState,
         onEvent = viewModel::onEvent,
         onUserEvent = userViewModel::onEvent,
-        onNavigateToLogin = onNavigateToLogin
+        onNavigateToLogin = onNavigateToLogin,
+        onNavigateToFriends = onNavigateToFriends
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NotesListScreen(
     state: NotesListState,
     userState: UserState,
     onEvent: (NotesListEvent) -> Unit,
     onUserEvent: (UserEvent) -> Unit,
-    onNavigateToLogin: () -> Unit
+    onNavigateToLogin: () -> Unit,
+    onNavigateToFriends: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    var isFabVisible by remember { mutableStateOf(true) }
+    val focusManager = LocalFocusManager.current
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < -5f) {
+                    isFabVisible = false
+                } else if (available.y > 5f) {
+                    isFabVisible = true
+                }
+                return Offset.Zero
+            }
+        }
+    }
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage.forEach { error ->
@@ -74,14 +131,16 @@ fun NotesListScreen(
     if (state.showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { onEvent(NotesListEvent.OnDismissLogoutDialog) },
+            icon = { Icon(Icons.Outlined.ExitToApp, contentDescription = null) },
             title = { Text("Cerrar Sesión") },
-            text = { Text("¿Seguro quieres cerrar sesión?") },
+            text = { Text("¿Seguro quieres cerrar sesión en NotableLists?") },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         onUserEvent(UserEvent.Logout)
                         onEvent(NotesListEvent.OnDismissLogoutDialog)
-                    }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
                     Text("Cerrar Sesión")
                 }
@@ -96,16 +155,74 @@ fun NotesListScreen(
         )
     }
 
+    if (state.showDeleteSelectionDialog) {
+        AlertDialog(
+            onDismissRequest = { onEvent(NotesListEvent.OnDismissDeleteSelectionDialog) },
+            icon = { Icon(Icons.Default.Delete, contentDescription = null) },
+            title = { Text("Eliminar notas") },
+            text = { Text("¿Deseas eliminar las ${state.selectedNoteIds.size} notas seleccionadas?") },
+            confirmButton = {
+                TextButton(
+                    onClick = { onEvent(NotesListEvent.OnDeleteSelectedNotes) },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onEvent(NotesListEvent.OnDismissDeleteSelectionDialog) }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
     Scaffold(
+        modifier = Modifier
+            .nestedScroll(nestedScrollConnection)
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = {
+                    focusManager.clearFocus()
+                })
+            },
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { onEvent(NotesListEvent.OnAddNoteClick) },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                shape = RoundedCornerShape(16.dp)
+            val fabContainerColor by animateColorAsState(
+                if (state.isSelectionMode) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                label = "fabColor"
+            )
+            val fabContentColor by animateColorAsState(
+                if (state.isSelectionMode) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
+                label = "fabContent"
+            )
+
+            AnimatedVisibility(
+                visible = isFabVisible || state.isSelectionMode,
+                enter = scaleIn() + fadeIn(),
+                exit = scaleOut() + fadeOut()
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = null)
+                ExtendedFloatingActionButton(
+                    onClick = { onEvent(NotesListEvent.OnAddNoteClick) },
+                    containerColor = fabContainerColor,
+                    contentColor = fabContentColor,
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
+                    expanded = state.isSelectionMode,
+                    icon = {
+                        AnimatedContent(
+                            targetState = state.isSelectionMode,
+                            transitionSpec = { scaleIn() togetherWith scaleOut() },
+                            label = "fabIcon"
+                        ) { isSelectionMode ->
+                            if (isSelectionMode) {
+                                Icon(imageVector = Icons.Default.Delete, contentDescription = "Eliminar seleccionados")
+                            } else {
+                                Icon(imageVector = Icons.Default.Add, contentDescription = "Crear nota")
+                            }
+                        }
+                    },
+                    text = { Text("Eliminar") }
+                )
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -117,10 +234,12 @@ fun NotesListScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
         ) {
+            Spacer(modifier = Modifier.height(12.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 CustomSearchBar(
                     query = state.searchQuery,
@@ -130,12 +249,14 @@ fun NotesListScreen(
 
                 UserAvatarMenu(
                     currentUser = userState.currentUser,
+                    pendingRequestCount = state.pendingRequestCount,
                     onLogoutClick = { onEvent(NotesListEvent.OnShowLogoutDialog) },
-                    onLoginClick = onNavigateToLogin
+                    onLoginClick = onNavigateToLogin,
+                    onFriendsClick = onNavigateToFriends
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             FilterChipsSection(
                 filters = state.filterChips,
@@ -147,23 +268,41 @@ fun NotesListScreen(
             Box(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp),
+                    contentPadding = PaddingValues(bottom = 88.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
                     items(state.loadingStatus) {
                         Box(
-                            modifier = Modifier.fillParentMaxSize(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator()
+                            CircularWavyProgressIndicator(
+                                modifier = Modifier.size(48.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
 
                     items(state.notes, key = { it.id }) { noteUi ->
                         NoteItemCard(
+                            modifier = Modifier.animateItem(
+                                placementSpec = spring(stiffness = Spring.StiffnessLow, dampingRatio = Spring.DampingRatioLowBouncy),
+                                fadeInSpec = spring(stiffness = Spring.StiffnessMedium),
+                                fadeOutSpec = spring(stiffness = Spring.StiffnessMedium)
+                            ),
                             noteUi = noteUi,
-                            onClick = { onEvent(NotesListEvent.OnNoteClick(noteUi.id)) }
+                            isSelectionMode = state.isSelectionMode,
+                            onClick = { onEvent(NotesListEvent.OnNoteClick(noteUi.id)) },
+                            onLongClick = { onEvent(NotesListEvent.OnNoteLongClick(noteUi.id)) }
                         )
+                    }
+
+                    if (!state.loadingStatus.isNotEmpty() && state.notes.isEmpty()) {
+                        item {
+                            EmptyStateMessage()
+                        }
                     }
                 }
             }
@@ -172,70 +311,174 @@ fun NotesListScreen(
 }
 
 @Composable
+fun EmptyStateMessage() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 64.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.NoteAlt,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.surfaceVariant
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "No hay notas aún",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "Crea una nueva nota para empezar",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        )
+    }
+}
+
+@Composable
 fun UserAvatarMenu(
     currentUser: String,
+    pendingRequestCount: Int,
     onLogoutClick: () -> Unit,
-    onLoginClick: () -> Unit
+    onLoginClick: () -> Unit,
+    onFriendsClick: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val isLoggedIn = currentUser.isNotBlank()
 
+    val cornerRadius by animateDpAsState(
+        targetValue = if (expanded) 16.dp else 50.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "avatarShape"
+    )
+
+    val containerColor by animateColorAsState(
+        targetValue = if (expanded) MaterialTheme.colorScheme.primaryContainer else if (isLoggedIn) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+        label = "avatarColor"
+    )
+
+    val contentColor by animateColorAsState(
+        targetValue = if (expanded) MaterialTheme.colorScheme.onPrimaryContainer else if (isLoggedIn) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "avatarContentColor"
+    )
+
     Box {
-        IconButton(
+        Surface(
             onClick = { expanded = true },
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = if (isLoggedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                contentColor = if (isLoggedIn) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            shape = RoundedCornerShape(cornerRadius),
+            color = containerColor,
+            contentColor = contentColor,
+            modifier = Modifier.size(56.dp),
+            border = if (isLoggedIn || expanded) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
         ) {
-            if (isLoggedIn) {
-                Text(
-                    text = currentUser.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.AccountCircle,
-                    contentDescription = null
-                )
+            Box(contentAlignment = Alignment.Center) {
+                if (isLoggedIn) {
+                    Text(
+                        text = currentUser.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    if (pendingRequestCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(4.dp)
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.error)
+                        )
+                    }
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Login",
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         }
 
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            if (isLoggedIn) {
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(
-                                text = "Hola, $currentUser",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.secondary
-                            )
-                        }
-                    },
-                    onClick = { },
-                    enabled = false
-                )
-                HorizontalDivider()
-                DropdownMenuItem(
-                    text = { Text("Cerrar Sesión") },
-                    onClick = {
-                        onLogoutClick()
-                        expanded = false
+        MaterialTheme(shapes = MaterialTheme.shapes.copy(extraSmall = RoundedCornerShape(16.dp))) {
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier
+                    .width(260.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainer),
+                offset = androidx.compose.ui.unit.DpOffset(0.dp, 8.dp)
+            ) {
+                if (isLoggedIn) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 16.dp)
+                    ) {
+                        Text(
+                            text = "Hola,",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = currentUser,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                )
-            } else {
-                DropdownMenuItem(
-                    text = { Text("Iniciar Sesión") },
-                    onClick = {
-                        onLoginClick()
-                        expanded = false
-                    }
-                )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Lista de Amigos")
+                                if (pendingRequestCount > 0) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Badge(containerColor = MaterialTheme.colorScheme.error) {
+                                        Text(pendingRequestCount.toString())
+                                    }
+                                }
+                            }
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Group, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        },
+                        onClick = {
+                            onFriendsClick()
+                            expanded = false
+                        },
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                    )
+
+                    DropdownMenuItem(
+                        text = { Text("Cerrar Sesión") },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.ExitToApp, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        },
+                        onClick = {
+                            onLogoutClick()
+                            expanded = false
+                        },
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                    )
+                } else {
+                    DropdownMenuItem(
+                        text = { Text("Iniciar Sesión") },
+                        leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
+                        onClick = {
+                            onLoginClick()
+                            expanded = false
+                        },
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                    )
+                }
             }
         }
     }
@@ -247,12 +490,34 @@ fun CustomSearchBar(
     query: String,
     onQueryChange: (String) -> Unit
 ) {
+    var isFocused by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+
+    val cornerRadius by animateDpAsState(
+        targetValue = if (isFocused) 28.dp else 16.dp,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "searchBarShape"
+    )
+
+    val containerColor by animateColorAsState(
+        targetValue = if (isFocused) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
+        label = "searchBarColor"
+    )
+
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(50),
-        placeholder = { Text("Buscar notas...") },
+        modifier = modifier
+            .height(56.dp)
+            .onFocusChanged { isFocused = it.isFocused },
+        shape = RoundedCornerShape(cornerRadius),
+        placeholder = {
+            Text(
+                "Buscar notas...",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        },
         leadingIcon = {
             Icon(
                 imageVector = Icons.Default.Search,
@@ -261,12 +526,18 @@ fun CustomSearchBar(
             )
         },
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            focusedContainerColor = containerColor,
+            unfocusedContainerColor = containerColor,
             focusedBorderColor = Color.Transparent,
-            unfocusedBorderColor = Color.Transparent
+            unfocusedBorderColor = Color.Transparent,
+            cursorColor = MaterialTheme.colorScheme.primary
         ),
-        singleLine = true
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyLarge,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = {
+            focusManager.clearFocus()
+        })
     )
 }
 
@@ -276,103 +547,159 @@ fun FilterChipsSection(
     onFilterSelected: (NoteFilter) -> Unit
 ) {
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp)
     ) {
         items(filters) { item ->
-            val containerColor = if (item.isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-            val contentColor = if (item.isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-            val borderColor = if (item.isSelected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant
+            val isSelected = item.isSelected
 
-            SuggestionChip(
+            FilterChip(
+                selected = isSelected,
                 onClick = { onFilterSelected(item.filter) },
                 label = { Text(item.label) },
+                leadingIcon = if (isSelected) {
+                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                } else null,
                 shape = RoundedCornerShape(12.dp),
-                colors = SuggestionChipDefaults.suggestionChipColors(
-                    containerColor = containerColor,
-                    labelColor = contentColor
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = isSelected,
+                    borderColor = MaterialTheme.colorScheme.outlineVariant,
+                    selectedBorderColor = Color.Transparent
                 ),
-                border = BorderStroke(1.dp, borderColor)
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = Color.Transparent,
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    iconColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NoteItemCard(
+    modifier: Modifier = Modifier,
     noteUi: NoteUiItem,
-    onClick: () -> Unit
+    isSelectionMode: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
-    val (containerColor, contentColor) = noteUi.style.getColors()
+    val (baseContainerColor, contentColor) = noteUi.style.getColors()
+
+    val scale by animateFloatAsState(
+        targetValue = if (noteUi.isSelected) 0.95f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "scale"
+    )
+
+    val containerColor by animateColorAsState(
+        targetValue = if (noteUi.isSelected) MaterialTheme.colorScheme.surfaceVariant else baseContainerColor,
+        label = "color"
+    )
+
+    val borderColor by animateColorAsState(
+        targetValue = if (noteUi.isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        label = "border"
+    )
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+            .scale(scale)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = containerColor
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = BorderStroke(2.dp, borderColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (noteUi.isSelected) 0.dp else 2.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = noteUi.title,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = contentColor,
-                modifier = Modifier.fillMaxWidth(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            if (noteUi.description.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+        Box {
+            Column(
+                modifier = Modifier.padding(20.dp)
+            ) {
                 Text(
-                    text = noteUi.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = contentColor.copy(alpha = 0.9f),
-                    maxLines = 6,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.2
+                    text = noteUi.title,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = contentColor,
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+
+                if (noteUi.description.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = noteUi.description,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = contentColor.copy(alpha = 0.85f),
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.3
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    noteUi.priorityChips.forEach { priority ->
+                        val (_, pContent) = priority.style.getColors()
+                        MetaDataChip(
+                            text = priority.label,
+                            icon = Icons.Default.Flag,
+                            contentColor = pContent,
+                            containerColor = pContent.copy(alpha = 0.1f)
+                        )
+                    }
+
+                    noteUi.tags.forEach { tag ->
+                        val (_, tContent) = tag.style.getColors()
+                        MetaDataChip(
+                            text = tag.label,
+                            icon = Icons.Default.Label,
+                            contentColor = contentColor,
+                            containerColor = contentColor.copy(alpha = 0.1f)
+                        )
+                    }
+
+                    noteUi.reminder?.let { reminder ->
+                        MetaDataChip(
+                            text = reminder,
+                            icon = Icons.Default.Alarm,
+                            contentColor = contentColor,
+                            containerColor = contentColor.copy(alpha = 0.1f)
+                        )
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                noteUi.priorityChips.forEach { priority ->
-                    val (_, pContent) = priority.style.getColors()
-                    MetaDataChip(
-                        text = priority.label,
-                        icon = Icons.Default.Flag,
-                        contentColor = pContent,
-                        containerColor = pContent.copy(alpha = 0.1f)
-                    )
-                }
-
-                noteUi.tags.forEach { tag ->
-                    val (_, tContent) = tag.style.getColors()
-                    MetaDataChip(
-                        text = tag.label,
-                        icon = Icons.Default.Label,
-                        contentColor = contentColor,
-                        containerColor = contentColor.copy(alpha = 0.1f)
-                    )
-                }
-
-                noteUi.reminder?.let { reminder ->
-                    MetaDataChip(
-                        text = reminder,
-                        icon = Icons.Default.Alarm,
-                        contentColor = contentColor,
-                        containerColor = contentColor.copy(alpha = 0.1f)
+            if (noteUi.isSelected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                        .size(24.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -389,22 +716,22 @@ fun MetaDataChip(
 ) {
     Surface(
         color = containerColor,
-        shape = RoundedCornerShape(8.dp)
+        shape = RoundedCornerShape(10.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(14.dp),
-                tint = contentColor
+                tint = contentColor.copy(alpha = 0.8f)
             )
             Text(
                 text = text,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
                 color = contentColor
             )
         }
@@ -414,49 +741,8 @@ fun MetaDataChip(
 @Composable
 fun NoteStyle.getColors(): Pair<Color, Color> {
     return when (this) {
-        NoteStyle.Secondary -> MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+        NoteStyle.Secondary -> MaterialTheme.colorScheme.surfaceContainerHighest to MaterialTheme.colorScheme.onSurface
         NoteStyle.Primary -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
         NoteStyle.Error -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-    }
-}
-
-@Preview(showBackground = true, showSystemUi = true)
-@Composable
-fun PreviewNotesListRoute() {
-    NotableListsTheme {
-        NotesListScreen(
-            state = NotesListState(
-                notes = listOf(
-                    NoteUiItem(
-                        id = "1",
-                        title = "Meeting Notes",
-                        description = "Discussed project timeline and deliverables with the team.",
-                        style = NoteStyle.Secondary,
-                        priorityChips = listOf(PriorityUiItem("Media", NoteStyle.Primary)),
-                        tags = listOf(TagUiItem("work", NoteStyle.Secondary))
-                    ),
-                    NoteUiItem(
-                        id = "2",
-                        title = "Shopping List",
-                        description = "Milk, Eggs, Bread, Fruits, Vegetables",
-                        style = NoteStyle.Primary,
-                        priorityChips = emptyList(),
-                        tags = listOf(TagUiItem("personal", NoteStyle.Primary))
-                    )
-                ),
-                filterChips = NoteFilter.entries.map { filter ->
-                    FilterUiItem(
-                        filter = filter,
-                        label = filter.label,
-                        isSelected = filter == NoteFilter.DATE
-                    )
-                },
-                searchQuery = ""
-            ),
-            userState = UserState(currentUser = "john_doe"),
-            onEvent = {},
-            onUserEvent = {},
-            onNavigateToLogin = {}
-        )
     }
 }

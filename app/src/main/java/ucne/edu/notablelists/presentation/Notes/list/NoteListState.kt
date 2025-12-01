@@ -7,8 +7,13 @@ data class NotesListState(
     val errorMessage: List<String> = emptyList(),
     val navigateToDetail: List<String?> = emptyList(),
     val searchQuery: String = "",
-    val showLogoutDialog: Boolean = false
-)
+    val showLogoutDialog: Boolean = false,
+    val selectedNoteIds: Set<String> = emptySet(),
+    val showDeleteSelectionDialog: Boolean = false,
+    val pendingRequestCount: Int = 0
+) {
+    val isSelectionMode: Boolean get() = selectedNoteIds.isNotEmpty()
+}
 
 enum class NoteStyle {
     Primary,
@@ -29,7 +34,8 @@ data class NoteUiItem(
     val style: NoteStyle,
     val reminder: String? = null,
     val priorityChips: List<PriorityUiItem> = emptyList(),
-    val tags: List<TagUiItem> = emptyList()
+    val tags: List<TagUiItem> = emptyList(),
+    val isSelected: Boolean = false
 )
 
 data class PriorityUiItem(

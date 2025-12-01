@@ -1,6 +1,5 @@
 package ucne.edu.notablelists.presentation.Notes.list
 
-import android.util.Log
 import ucne.edu.notablelists.domain.session.usecase.GetUserIdUseCase
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import ucne.edu.notablelists.data.remote.Resource
+import ucne.edu.notablelists.domain.friends.usecase.GetPendingRequestUseCase
 import ucne.edu.notablelists.domain.notes.model.Note
 import ucne.edu.notablelists.domain.notes.usecase.*
 import javax.inject.Inject
@@ -19,7 +19,8 @@ class NotesListViewModel @Inject constructor(
     private val upsertNoteUseCase: UpsertNoteUseCase,
     private val getUserIdUseCase: GetUserIdUseCase,
     private val fetchUserNotesUseCase: FetchUserNotesUseCase,
-    private val postPendingNotesUseCase: PostPendingNotesUseCase
+    private val postPendingNotesUseCase: PostPendingNotesUseCase,
+    private val getPendingRequestUseCase: GetPendingRequestUseCase
 ) : ViewModel() {
 
     private val _rawNotes = MutableStateFlow<List<Note>>(emptyList())
@@ -30,6 +31,9 @@ class NotesListViewModel @Inject constructor(
     private val _isRefreshing = MutableStateFlow(false)
     private val _navigationEvent = MutableStateFlow<List<String?>>(emptyList())
     private val _showLogoutDialog = MutableStateFlow(false)
+    private val _selectedNoteIds = MutableStateFlow<Set<String>>(emptySet())
+    private val _showDeleteSelectionDialog = MutableStateFlow(false)
+    private val _pendingRequestCount = MutableStateFlow(0)
 
     private val _filterState = combine(_searchQuery, _selectedFilter) { query, filter ->
         Pair(query, filter)
@@ -39,20 +43,36 @@ class NotesListViewModel @Inject constructor(
         Triple(loading, error, refreshing)
     }
 
+    @Suppress("UNCHECKED_CAST")
     val state: StateFlow<NotesListState> = combine(
         _rawNotes,
         _filterState,
         _uiStatusState,
         _navigationEvent,
-        _showLogoutDialog
-    ) { notes, (query, selectedFilter), (isLoading, errorMessage, _), navEvent, showDialog ->
+        _showLogoutDialog,
+        _selectedNoteIds,
+        _showDeleteSelectionDialog,
+        _pendingRequestCount
+    ) { args ->
+        // Cuando combine recibe más de 5 flujos, devuelve un Array<Any>
+        val notes = args[0] as List<Note>
+        val filterState = args[1] as Pair<String, NoteFilter>
+        val uiStatusState = args[2] as Triple<Boolean, String?, Boolean>
+        val navEvent = args[3] as List<String?>
+        val showLogout = args[4] as Boolean
+        val selectedIds = args[5] as Set<String>
+        val showDeleteDialog = args[6] as Boolean
+        val pendingCount = args[7] as Int
+
+        val (query, selectedFilter) = filterState
+        val (isLoading, errorMessage, _) = uiStatusState
 
         val filteredNotes = filterAndSortNotes(notes, query, selectedFilter)
 
         val uiNotes = if (isLoading && notes.isEmpty()) {
             emptyList()
         } else {
-            filteredNotes.map { note -> mapToUiItem(note) }
+            filteredNotes.map { note -> mapToUiItem(note, selectedIds.contains(note.id)) }
         }
 
         val uiFilters = NoteFilter.entries.map { filter ->
@@ -69,7 +89,10 @@ class NotesListViewModel @Inject constructor(
             errorMessage = errorList,
             navigateToDetail = navEvent,
             searchQuery = query,
-            showLogoutDialog = showDialog
+            showLogoutDialog = showLogout,
+            selectedNoteIds = selectedIds,
+            showDeleteSelectionDialog = showDeleteDialog,
+            pendingRequestCount = pendingCount
         )
     }.stateIn(
         viewModelScope,
@@ -86,17 +109,49 @@ class NotesListViewModel @Inject constructor(
             is NotesListEvent.Refresh -> refresh()
             is NotesListEvent.DeleteNote -> deleteNote(event.id)
             is NotesListEvent.ToggleNoteFinished -> toggleNoteFinished(event.note)
-            is NotesListEvent.OnAddNoteClick -> _navigationEvent.value = listOf(null)
-            is NotesListEvent.OnNoteClick -> _navigationEvent.value = listOf(event.id)
+            is NotesListEvent.OnAddNoteClick -> {
+                if (_selectedNoteIds.value.isNotEmpty()) {
+                    _showDeleteSelectionDialog.value = true
+                } else {
+                    _navigationEvent.value = listOf(null)
+                }
+            }
+            is NotesListEvent.OnNoteClick -> handleNoteClick(event.id)
+            is NotesListEvent.OnNoteLongClick -> handleNoteLongClick(event.id)
             is NotesListEvent.OnSearchQueryChange -> _searchQuery.value = event.query
             is NotesListEvent.OnFilterChange -> _selectedFilter.value = event.filter
             is NotesListEvent.OnNavigationHandled -> _navigationEvent.value = emptyList()
             is NotesListEvent.OnShowLogoutDialog -> _showLogoutDialog.value = true
             is NotesListEvent.OnDismissLogoutDialog -> _showLogoutDialog.value = false
+            NotesListEvent.OnDeleteSelectedNotes -> deleteSelectedNotes()
+            NotesListEvent.OnShowDeleteSelectionDialog -> _showDeleteSelectionDialog.value = true
+            NotesListEvent.OnDismissDeleteSelectionDialog -> _showDeleteSelectionDialog.value = false
+            NotesListEvent.OnClearSelection -> _selectedNoteIds.value = emptySet()
         }
     }
 
-    private fun mapToUiItem(note: Note): NoteUiItem {
+    private fun handleNoteClick(id: String) {
+        if (_selectedNoteIds.value.isNotEmpty()) {
+            toggleSelection(id)
+        } else {
+            _navigationEvent.value = listOf(id)
+        }
+    }
+
+    private fun handleNoteLongClick(id: String) {
+        toggleSelection(id)
+    }
+
+    private fun toggleSelection(id: String) {
+        val current = _selectedNoteIds.value
+        _selectedNoteIds.value = if (current.contains(id)) {
+            current - id
+        } else {
+            current + id
+        }
+    }
+
+    private fun mapToUiItem(note: Note, isSelected: Boolean): NoteUiItem {
         val style = when (note.priority) {
             2 -> NoteStyle.Error
             1 -> NoteStyle.Primary
@@ -127,7 +182,8 @@ class NotesListViewModel @Inject constructor(
             style = style,
             reminder = note.reminder,
             priorityChips = priorityList,
-            tags = tagList
+            tags = tagList,
+            isSelected = isSelected
         )
     }
 
@@ -146,25 +202,33 @@ class NotesListViewModel @Inject constructor(
             val userId = getUserIdUseCase().first()
 
             if (userId != null) {
+                launch { checkPendingRequests(userId) }
+
                 when (val apiResult = fetchUserNotesUseCase(userId)) {
                     is Resource.Success -> {
                         apiResult.data?.let { apiNotes ->
                             _rawNotes.value = apiNotes
-                            Log.d("LOAD_NOTES", "API fetch successful, got ${apiNotes.size} notes")
                         }
                     }
                     is Resource.Error -> {
-                        Log.e("LOAD_NOTES", "API fetch failed: ${apiResult.message}")
                     }
                     else -> {}
                 }
-            } else {
             }
 
             getNotesUseCase().onEach { notes ->
                 _rawNotes.value = notes
                 _isLoading.value = false
             }.launchIn(viewModelScope)
+        }
+    }
+
+    private suspend fun checkPendingRequests(userId: Int) {
+        when (val result = getPendingRequestUseCase(userId)) {
+            is Resource.Success -> {
+                _pendingRequestCount.value = result.data?.size ?: 0
+            }
+            else -> {}
         }
     }
 
@@ -198,6 +262,20 @@ class NotesListViewModel @Inject constructor(
         }
     }
 
+    private fun deleteSelectedNotes() {
+        viewModelScope.launch {
+            _showDeleteSelectionDialog.value = false
+            val idsToDelete = _selectedNoteIds.value.toList()
+            _selectedNoteIds.value = emptySet()
+
+            _isLoading.value = true
+            idsToDelete.forEach { id ->
+                deleteNoteUseCase(id)
+            }
+            _isLoading.value = false
+        }
+    }
+
     private fun toggleNoteFinished(note: Note) {
         viewModelScope.launch {
             val userId = getUserIdUseCase().first()
@@ -210,6 +288,7 @@ class NotesListViewModel @Inject constructor(
             _isRefreshing.value = true
             val userId = getUserIdUseCase().first()
             if (userId != null) {
+                checkPendingRequests(userId)
                 fetchUserNotesUseCase(userId)
                 val result = postPendingNotesUseCase(userId)
                 if (result is Resource.Error) {
