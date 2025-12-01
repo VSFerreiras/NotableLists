@@ -12,4 +12,5 @@ interface FriendsRepository {
     suspend fun getFriends(userId: Int): Resource<List<FriendDto>>
     suspend fun getAllUsers(): Resource<List<UserResponseDto>>
     suspend fun searchUsers(username: String): Resource<List<UserResponseDto>>
+    suspend fun removeFriend(userId: Int, friendId: Int): Resource<Unit>
 }
