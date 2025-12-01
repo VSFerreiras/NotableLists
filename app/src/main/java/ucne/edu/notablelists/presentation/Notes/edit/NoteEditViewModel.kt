@@ -18,6 +18,8 @@ import ucne.edu.notablelists.data.remote.Resource
 import ucne.edu.notablelists.domain.notes.model.Note
 import ucne.edu.notablelists.domain.notes.repository.NoteRepository
 import ucne.edu.notablelists.domain.notes.usecase.*
+import ucne.edu.notablelists.domain.notification.CancelReminderUseCase
+import ucne.edu.notablelists.domain.notification.ScheduleReminderUseCase
 import ucne.edu.notablelists.domain.session.usecase.GetUserIdUseCase
 import java.time.Instant
 import java.time.LocalDateTime
@@ -35,7 +37,8 @@ class NoteEditViewModel @Inject constructor(
     private val putNoteUseCase: PutNoteUseCase,
     private val getUserIdUseCase: GetUserIdUseCase,
     private val noteRepository: NoteRepository,
-    private val alarmScheduler: AlarmScheduler,
+    private val scheduleReminderUseCase: ScheduleReminderUseCase,
+    private val cancelReminderUseCase: CancelReminderUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -73,7 +76,7 @@ class NoteEditViewModel @Inject constructor(
                 val noteId = _state.value.id ?: UUID.randomUUID().toString()
 
                 _state.update { it.copy(id = noteId, reminder = formattedDate) }
-                alarmScheduler.schedule(noteId, _state.value.title.ifBlank { "Sin Título" }, localDateTime)
+                scheduleReminderUseCase(noteId, _state.value.title.ifBlank { "Sin Título" }, localDateTime)
             }
             is NoteEditEvent.AddChecklistItem -> {
                 val newItem = ChecklistItem("", false)
@@ -117,7 +120,7 @@ class NoteEditViewModel @Inject constructor(
                 saveNoteAndExit()
             }
             is NoteEditEvent.ClearReminder -> {
-                _state.value.id?.let { alarmScheduler.cancel(it) }
+                _state.value.id?.let { cancelReminderUseCase(it) }
                 _state.update { it.copy(reminder = null) }
             }
             is NoteEditEvent.ShowTagSheet -> {
@@ -249,7 +252,7 @@ class NoteEditViewModel @Inject constructor(
             val remoteId = _state.value.remoteId
 
             if (id != null) {
-                alarmScheduler.cancel(id)
+                cancelReminderUseCase(id)
                 if (remoteId != null) {
                     deleteRemoteNoteUseCase(remoteId)
                 }
