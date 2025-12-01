@@ -46,4 +46,8 @@ class FriendsRepositoryImpl @Inject constructor(
             is Resource.Loading -> allUsers
         }
     }
+
+    override suspend fun removeFriend(userId: Int, friendId: Int): Resource<Unit> {
+        return remoteDataSource.removeFriend(userId, friendId)
+    }
 }
