@@ -145,22 +145,18 @@ class NotesListViewModel @Inject constructor(
             val userId = getUserIdUseCase().first()
 
             if (userId != null) {
-                Log.d("LOAD_NOTES", "User logged in, fetching from API...")
                 when (val apiResult = fetchUserNotesUseCase(userId)) {
                     is Resource.Success -> {
                         Log.d("LOAD_NOTES", "API fetch successful, got ${apiResult.data?.size ?: 0} notes")
                     }
                     is Resource.Error -> {
-                        Log.e("LOAD_NOTES", "API fetch failed: ${apiResult.message}")
                     }
                     else -> {}
                 }
             } else {
-                Log.d("LOAD_NOTES", "User not logged in, loading local notes only")
             }
 
             getNotesUseCase().onEach { notes ->
-                Log.d("LOAD_NOTES", "Loaded ${notes.size} notes from local DB")
                 _rawNotes.value = notes
                 _isLoading.value = false
             }.launchIn(viewModelScope)
