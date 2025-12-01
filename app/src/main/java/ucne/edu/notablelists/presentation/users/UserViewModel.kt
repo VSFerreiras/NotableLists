@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import ucne.edu.notablelists.data.remote.Resource
 import ucne.edu.notablelists.domain.auth.AuthRepository
 import ucne.edu.notablelists.domain.notes.repository.NoteRepository
+import ucne.edu.notablelists.domain.notes.usecase.ClearLocalNotesUseCase
 import ucne.edu.notablelists.domain.session.usecase.ClearSessionUseCase
 import ucne.edu.notablelists.domain.session.usecase.GetSessionUseCase
 import ucne.edu.notablelists.domain.session.usecase.SaveSessionUseCase
@@ -29,6 +30,7 @@ class UserViewModel @Inject constructor(
     private val getUserIdUseCase: GetUserIdUseCase,
     private val clearSessionUseCase: ClearSessionUseCase,
     private val loginUserUseCase: LoginUserUseCase,
+    private val clearLocalNotesUseCase: ClearLocalNotesUseCase,
     private val syncUserDataUseCase: SyncUserDataUseCase,
 ) : ViewModel() {
 
@@ -234,6 +236,7 @@ class UserViewModel @Inject constructor(
     private fun logout() {
         viewModelScope.launch {
             clearSessionUseCase()
+            clearLocalNotesUseCase()
             _state.update {
                 UserState(
                     username = "",
