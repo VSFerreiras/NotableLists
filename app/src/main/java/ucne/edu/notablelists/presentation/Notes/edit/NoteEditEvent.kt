@@ -16,4 +16,9 @@ sealed interface NoteEditEvent {
     data object DismissDeleteDialog : NoteEditEvent
     data object OnBackClick : NoteEditEvent
     data object ClearReminder : NoteEditEvent
+    data object ShowTagSheet : NoteEditEvent
+    data object HideTagSheet : NoteEditEvent
+    data class SelectTag(val tag: String) : NoteEditEvent
+    data class CreateNewTag(val tag: String) : NoteEditEvent
+    data class DeleteAvailableTag(val tag: String) : NoteEditEvent
 }

@@ -13,7 +13,9 @@ data class NoteEditState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val isNoteSaved: Boolean = false,
-    val showDeleteDialog: Boolean = false
+    val showDeleteDialog: Boolean = false,
+    val isTagSheetOpen: Boolean = false,
+    val availableTags: List<String> = listOf("Personal", "Trabajo", "Estudio", "Ideas", "Urgente")
 )
 
 data class ChecklistItem(

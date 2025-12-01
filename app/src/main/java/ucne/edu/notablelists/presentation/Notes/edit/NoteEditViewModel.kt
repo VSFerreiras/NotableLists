@@ -1,7 +1,6 @@
 package ucne.edu.notablelists.presentation.Notes.edit
 
 import android.util.Log
-import ucne.edu.notablelists.domain.session.usecase.GetUserIdUseCase
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -16,10 +15,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ucne.edu.notablelists.data.local.AlarmScheduler
 import ucne.edu.notablelists.data.remote.Resource
-import ucne.edu.notablelists.domain.TriggerSyncUseCase
 import ucne.edu.notablelists.domain.notes.model.Note
 import ucne.edu.notablelists.domain.notes.repository.NoteRepository
 import ucne.edu.notablelists.domain.notes.usecase.*
+import ucne.edu.notablelists.domain.session.usecase.GetUserIdUseCase
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -33,9 +32,7 @@ class NoteEditViewModel @Inject constructor(
     private val getNoteUseCase: GetNoteUseCase,
     private val deleteNoteUseCase: DeleteNoteUseCase,
     private val deleteRemoteNoteUseCase: DeleteRemoteNoteUseCase,
-    private val postNoteUseCase: PostNoteUseCase,
     private val putNoteUseCase: PutNoteUseCase,
-    private val triggerSyncUseCase: TriggerSyncUseCase,
     private val getUserIdUseCase: GetUserIdUseCase,
     private val noteRepository: NoteRepository,
     private val alarmScheduler: AlarmScheduler,
@@ -119,9 +116,41 @@ class NoteEditViewModel @Inject constructor(
             is NoteEditEvent.OnBackClick -> {
                 saveNoteAndExit()
             }
-            NoteEditEvent.ClearReminder -> {
+            is NoteEditEvent.ClearReminder -> {
                 _state.value.id?.let { alarmScheduler.cancel(it) }
                 _state.update { it.copy(reminder = null) }
+            }
+            is NoteEditEvent.ShowTagSheet -> {
+                _state.update { it.copy(isTagSheetOpen = true) }
+            }
+            is NoteEditEvent.HideTagSheet -> {
+                _state.update { it.copy(isTagSheetOpen = false) }
+            }
+            is NoteEditEvent.SelectTag -> {
+                _state.update { it.copy(tag = event.tag, isTagSheetOpen = false) }
+            }
+            is NoteEditEvent.CreateNewTag -> {
+                if (event.tag.isNotBlank()) {
+                    val newTags = if (!_state.value.availableTags.contains(event.tag)) {
+                        _state.value.availableTags + event.tag
+                    } else {
+                        _state.value.availableTags
+                    }
+                    _state.update {
+                        it.copy(
+                            tag = event.tag,
+                            availableTags = newTags,
+                            isTagSheetOpen = false
+                        )
+                    }
+                }
+            }
+            is NoteEditEvent.DeleteAvailableTag -> {
+                _state.update {
+                    val newTags = it.availableTags - event.tag
+                    val currentTag = if (it.tag == event.tag) "" else it.tag
+                    it.copy(availableTags = newTags, tag = currentTag)
+                }
             }
         }
     }
@@ -131,8 +160,13 @@ class NoteEditViewModel @Inject constructor(
             _state.update { it.copy(isLoading = true) }
             val note = getNoteUseCase(id)
             note?.let { n ->
-                _state.update {
-                    it.copy(
+                _state.update { state ->
+                    val updatedTags = if (n.tag.isNotBlank() && !state.availableTags.contains(n.tag)) {
+                        state.availableTags + n.tag
+                    } else {
+                        state.availableTags
+                    }
+                    state.copy(
                         id = n.id,
                         remoteId = n.remoteId,
                         title = n.title,
@@ -142,6 +176,7 @@ class NoteEditViewModel @Inject constructor(
                         isFinished = n.isFinished,
                         reminder = n.reminder,
                         checklist = parseChecklist(n.checklist),
+                        availableTags = updatedTags,
                         isLoading = false
                     )
                 }
