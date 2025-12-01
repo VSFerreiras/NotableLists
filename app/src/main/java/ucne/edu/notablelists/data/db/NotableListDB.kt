@@ -8,7 +8,7 @@ import ucne.edu.notablelists.data.local.Users.UserEntity
 import ucne.edu.notablelists.data.local.Notes.NoteEntity
 
 @Database(entities = [UserEntity::class, NoteEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false)
 
 abstract class NotableListDB: RoomDatabase() {

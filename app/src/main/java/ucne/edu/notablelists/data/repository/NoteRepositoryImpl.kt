@@ -107,8 +107,6 @@ class NoteRepositoryImpl @Inject constructor(
                     reminder = note.reminder?: "",
                     checklist = note.checklist?: "",
                     priority = note.priority,
-                    deleteAt = note.deleteAt?: "",
-                    autoDelete = note.autoDelete
                 )
                 Log.d("SYNC", "Sending note: ${note.title} to user $userId")
                 val result = remoteDataSource.createUserNote(userId, request)
@@ -144,8 +142,7 @@ class NoteRepositoryImpl @Inject constructor(
                 reminder = note.reminder?: "",
                 checklist = note.checklist?: "",
                 priority = note.priority,
-                deleteAt = note.deleteAt?: "",
-                autoDelete = note.autoDelete,
+
                 userId = userId
             )
 
@@ -199,8 +196,6 @@ class NoteRepositoryImpl @Inject constructor(
                 reminder = note.reminder?: "",
                 checklist = note.checklist?: "",
                 priority = note.priority,
-                deleteAt = note.deleteAt?: "",
-                autoDelete = note.autoDelete,
                 userId = userId
             )
 

@@ -78,11 +78,6 @@ class NoteEditViewModel @Inject constructor(
                 _state.update { it.copy(id = noteId, reminder = formattedDate) }
                 alarmScheduler.schedule(noteId, _state.value.title.ifBlank { "Sin Título" }, localDateTime)
             }
-            is NoteEditEvent.SetAutoDelete -> {
-                val localDateTime = getLocalDateTime(event.date, event.timeHour, event.timeMinute)
-                val formattedDate = formatDateTime(localDateTime)
-                _state.update { it.copy(autoDelete = true, deleteAt = formattedDate) }
-            }
             is NoteEditEvent.AddChecklistItem -> {
                 val newItem = ChecklistItem("", false)
                 _state.update { it.copy(checklist = it.checklist + newItem) }
@@ -124,9 +119,6 @@ class NoteEditViewModel @Inject constructor(
             is NoteEditEvent.OnBackClick -> {
                 saveNoteAndExit()
             }
-            NoteEditEvent.ClearAutoDelete -> {
-                _state.update { it.copy(autoDelete = false, deleteAt = null) }
-            }
             NoteEditEvent.ClearReminder -> {
                 _state.value.id?.let { alarmScheduler.cancel(it) }
                 _state.update { it.copy(reminder = null) }
@@ -150,8 +142,6 @@ class NoteEditViewModel @Inject constructor(
                         isFinished = n.isFinished,
                         reminder = n.reminder,
                         checklist = parseChecklist(n.checklist),
-                        autoDelete = n.autoDelete,
-                        deleteAt = n.deleteAt,
                         isLoading = false
                     )
                 }
@@ -183,8 +173,6 @@ class NoteEditViewModel @Inject constructor(
                 isFinished = currentState.isFinished,
                 reminder = currentState.reminder,
                 checklist = checklistString,
-                autoDelete = currentState.autoDelete,
-                deleteAt = currentState.deleteAt
             )
 
             when (val result = upsertNoteUseCase(note, userId)) {

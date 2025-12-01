@@ -17,8 +17,6 @@ fun NoteEntity.toDomain(): Note = Note(
     reminder = reminder,
     checklist = checklist,
     priority = priority,
-    deleteAt = deleteAt,
-    autoDelete = autoDelete,
     isPendingCreate = isPendingCreate
 )
 
@@ -33,8 +31,6 @@ fun Note.toEntity(): NoteEntity = NoteEntity(
     reminder = reminder,
     checklist = checklist,
     priority = priority,
-    deleteAt = deleteAt,
-    autoDelete = autoDelete,
     isPendingCreate = isPendingCreate
 )
 
@@ -49,8 +45,6 @@ fun NoteResponseDto.toEntity(): NoteEntity = NoteEntity(
     reminder = reminder,
     checklist = checklist,
     priority = priority,
-    deleteAt = deleteAt,
-    autoDelete = autoDelete,
     isPendingCreate = false
 )
 
@@ -62,8 +56,6 @@ fun NoteEntity.toRequest(): NoteRequestDto = NoteRequestDto(
     reminder = reminder.orEmpty(),
     checklist = checklist.orEmpty(),
     priority = priority,
-    deleteAt = deleteAt.orEmpty(),
-    autoDelete = autoDelete,
     userId = userId
 )
 
@@ -75,8 +67,6 @@ fun Note.toRequest(): NoteRequestDto = NoteRequestDto(
     reminder = reminder.orEmpty(),
     checklist = checklist.orEmpty(),
     priority = priority,
-    deleteAt = deleteAt.orEmpty(),
-    autoDelete = autoDelete,
     userId = userId
 )
 
@@ -91,7 +81,5 @@ fun NoteResponseDto.toDomain(): Note = Note(
     reminder = reminder,
     checklist = checklist,
     priority = priority,
-    deleteAt = deleteAt,
-    autoDelete = autoDelete,
     isPendingCreate = false
 )

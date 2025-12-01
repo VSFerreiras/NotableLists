@@ -129,8 +129,6 @@ fun NoteEditScreen(
                         permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
                     viewModel.onEvent(NoteEditEvent.SetReminder(date, hour, minute))
-                } else {
-                    viewModel.onEvent(NoteEditEvent.SetAutoDelete(date, hour, minute))
                 }
                 showTimePicker = false
             }
@@ -171,11 +169,6 @@ fun NoteEditScreen(
                     showDatePicker = true
                     isMenuExpanded = false
                 },
-                onAutoDeleteClick = {
-                    pickerContext = PickerContext.AUTO_DELETE
-                    showDatePicker = true
-                    isMenuExpanded = false
-                },
                 onChecklistClick = {
                     viewModel.onEvent(NoteEditEvent.AddChecklistItem)
                     isMenuExpanded = false
@@ -210,7 +203,6 @@ fun NoteEditScreen(
             FlowRowChips(
                 state = state,
                 onRemoveReminder = { viewModel.onEvent(NoteEditEvent.ClearReminder) },
-                onRemoveAutoDelete = { viewModel.onEvent(NoteEditEvent.ClearAutoDelete) }
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -273,9 +265,8 @@ fun DateTimePickerDialog(
 fun FlowRowChips(
     state: NoteEditState,
     onRemoveReminder: () -> Unit,
-    onRemoveAutoDelete: () -> Unit
 ) {
-    if (state.priority > 0 || state.tag.isNotBlank() || state.reminder != null || state.autoDelete) {
+    if (state.priority > 0 || state.tag.isNotBlank() || state.reminder != null) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -290,9 +281,6 @@ fun FlowRowChips(
             }
             state.reminder?.let {
                 ChipInfo(text = it, icon = Icons.Default.Alarm, onDelete = onRemoveReminder)
-            }
-            if (state.autoDelete && state.deleteAt != null) {
-                ChipInfo(text = "Del: ${state.deleteAt}", icon = Icons.Default.Timer, onDelete = onRemoveAutoDelete)
             }
         }
     }
@@ -364,7 +352,6 @@ fun FabMenu(
     onToggle: () -> Unit,
     onPriorityClick: () -> Unit,
     onReminderClick: () -> Unit,
-    onAutoDeleteClick: () -> Unit,
     onChecklistClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
@@ -385,7 +372,6 @@ fun FabMenu(
             ) {
                 FabMenuItem(Icons.Default.Flag, "Prioridad", onPriorityClick)
                 FabMenuItem(Icons.Default.Alarm, "Recordatorio", onReminderClick)
-                FabMenuItem(Icons.Default.Timer, "Auto-Eliminar", onAutoDeleteClick)
                 FabMenuItem(Icons.Default.Checklist, "Lista", onChecklistClick)
                 FabMenuItem(Icons.Default.Delete, "Eliminar", onDeleteClick, MaterialTheme.colorScheme.errorContainer)
             }
