@@ -177,11 +177,11 @@ class UserViewModel @Inject constructor(
                         }
                     }
                     is Resource.Error -> {
-                        _state.update {
-                            it.copy(
-                                isLoading = false,
-                                error = result.message
-                            )
+                        val errorMessage = result.message ?: "Error desconocido"
+                        if (errorMessage.contains("400") || errorMessage.contains("404") || errorMessage.contains("401")) {
+                            setFieldErrors("Usuario o contraseña incorrectos")
+                        } else {
+                            setFieldErrors(errorMessage)
                         }
                     }
                     is Resource.Loading -> {
