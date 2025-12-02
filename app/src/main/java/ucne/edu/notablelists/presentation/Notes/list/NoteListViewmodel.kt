@@ -254,6 +254,7 @@ class NotesListViewModel @Inject constructor(
             while (isActive) {
                 try {
                     delay(5000)
+                    checkPendingRequests(userId)
                     fetchSharedNotes(userId)
                     fetchUserNotesUseCase(userId)
                 } catch (e: Exception) {
