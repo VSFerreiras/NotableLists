@@ -13,4 +13,5 @@ sealed interface FriendsEvent {
     data class OnShowDeleteFriendDialog(val friend: Friend) : FriendsEvent
     data object OnDismissDeleteFriendDialog : FriendsEvent
     data object OnDeleteFriend : FriendsEvent
+    data class OnDeclineFriendRequest(val friendshipId: Int) : FriendsEvent
 }
