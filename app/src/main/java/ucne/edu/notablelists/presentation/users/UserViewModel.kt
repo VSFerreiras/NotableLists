@@ -53,6 +53,7 @@ class UserViewModel @Inject constructor(
                 if (!user.isNullOrBlank()) {
                     _uiEffect.send(UserSideEffect.NavigateToProfile)
                 }
+                _state.update { it.copy(isSessionChecked = true) }
             }
         }
     }
@@ -117,7 +118,7 @@ class UserViewModel @Inject constructor(
                         resetState()
                     }
                     is Resource.Error -> {
-                        setFieldErrors(result.message)
+                        setFieldErrors(result.message ?: "Error desconocido")
                     }
                     is Resource.Loading -> {
                         _state.update { it.copy(isLoading = true) }
@@ -182,8 +183,9 @@ class UserViewModel @Inject constructor(
     }
 
     private fun setFieldErrors(errorMessage: String?) {
+        _state.update { it.copy(isLoading = false) }
+
         errorMessage?.let { message ->
-            _state.update { it.copy(isLoading = false) }
             when {
                 message.contains("usuario", ignoreCase = true) -> {
                     _state.update { it.copy(usernameError = message) }
