@@ -19,4 +19,5 @@ interface NoteRepository {
     fun observeLocalNotes(): Flow<List<Note>>
     suspend fun fetchUserNotesFromApi(userId: Int): Resource<List<Note>>
     suspend fun clearLocalNotes()
+    suspend fun getRemoteNote(noteId: Int): Resource<Note>
 }
