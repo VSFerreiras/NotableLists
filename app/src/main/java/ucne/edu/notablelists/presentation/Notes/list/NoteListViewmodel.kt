@@ -56,8 +56,12 @@ class NotesListViewModel @Inject constructor(
     }
 
     private val _combinedNotes = combine(_localNotes, _sharedNotes) { local, shared ->
-        val localIds = local.map { it.id }.toSet()
-        val uniqueShared = shared.filter { !localIds.contains(it.id) }
+        val localRemoteIds = local.mapNotNull { it.remoteId }.toSet()
+
+        val uniqueShared = shared.filter { sharedNote ->
+            sharedNote.remoteId == null || !localRemoteIds.contains(sharedNote.remoteId)
+        }
+
         local + uniqueShared
     }
 
@@ -248,9 +252,12 @@ class NotesListViewModel @Inject constructor(
         pollingJob?.cancel()
         pollingJob = viewModelScope.launch {
             while (isActive) {
-                delay(5000)
-                fetchSharedNotes(userId)
-                fetchUserNotesUseCase(userId)
+                try {
+                    delay(5000)
+                    fetchSharedNotes(userId)
+                    fetchUserNotesUseCase(userId)
+                } catch (e: Exception) {
+                }
             }
         }
     }
