@@ -255,4 +255,24 @@ class NoteRepositoryImpl @Inject constructor(
             Resource.Error(e.message ?: "Error obteniendo nota remota")
         }
     }
+
+    override suspend fun getRemoteUserNote(userId: Int, noteId: Int): Resource<Note> {
+        return try {
+            val result = remoteDataSource.getUserNoteById(userId, noteId)
+            when (result) {
+                is Resource.Success -> {
+                    val note = result.data?.toDomain()
+                    if (note != null) {
+                        Resource.Success(note)
+                    } else {
+                        Resource.Error("Nota vacía")
+                    }
+                }
+                is Resource.Error -> Resource.Error(result.message)
+                else -> Resource.Loading()
+            }
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Error obteniendo nota de usuario")
+        }
+    }
 }
