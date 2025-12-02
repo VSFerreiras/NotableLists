@@ -159,7 +159,9 @@ class FriendsViewModel @Inject constructor(
                     _state.update { it.copy(successMessage = "Solicitud enviada") }
                 }
                 is Resource.Error -> {
-                    _state.update { it.copy(errorMessage = result.message) }
+                    _state.update {
+                        it.copy(errorMessage = "Ya enviaste una solicitud a este usuario")
+                    }
                 }
                 is Resource.Loading -> {}
             }
