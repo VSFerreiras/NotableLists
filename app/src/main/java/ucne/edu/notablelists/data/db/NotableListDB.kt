@@ -6,9 +6,10 @@ import ucne.edu.notablelists.data.local.Notes.NoteDao
 import ucne.edu.notablelists.data.local.Users.UserDao
 import ucne.edu.notablelists.data.local.Users.UserEntity
 import ucne.edu.notablelists.data.local.Notes.NoteEntity
+import ucne.edu.notablelists.data.local.Notes.SharedNoteEntity
 
-@Database(entities = [UserEntity::class, NoteEntity::class],
-    version = 4,
+@Database(entities = [UserEntity::class, NoteEntity::class, SharedNoteEntity::class],
+    version = 5,
     exportSchema = false)
 
 abstract class NotableListDB: RoomDatabase() {

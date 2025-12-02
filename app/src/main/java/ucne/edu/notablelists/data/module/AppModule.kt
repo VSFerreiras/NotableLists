@@ -25,12 +25,14 @@ import ucne.edu.notablelists.data.repository.AuthRepositoryImpl
 import ucne.edu.notablelists.data.repository.FriendsRepositoryImpl
 import ucne.edu.notablelists.data.repository.NoteRepositoryImpl
 import ucne.edu.notablelists.data.repository.SessionRepositoryImpl
+import ucne.edu.notablelists.data.repository.SharedNoteRepositoryImpl
 import ucne.edu.notablelists.data.repository.UserRepositoryImpl
 import ucne.edu.notablelists.domain.auth.AuthRepository
 import ucne.edu.notablelists.domain.friends.repository.FriendsRepository
 import ucne.edu.notablelists.domain.notes.repository.NoteRepository
 import ucne.edu.notablelists.domain.notification.ReminderScheduler
 import ucne.edu.notablelists.domain.session.SessionRepository
+import ucne.edu.notablelists.domain.sharednote.repository.SharedNoteRepository
 import ucne.edu.notablelists.domain.users.repository.UserRepository
 import javax.inject.Singleton
 
@@ -136,5 +138,11 @@ object AppModule {
     @Singleton
     fun provideReminderScheduler(@ApplicationContext context: Context): ReminderScheduler {
         return AlarmScheduler(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSharedNotesRepository(noteDao: NoteDao, remoteDataSource: NoteRemoteDataSource): SharedNoteRepository {
+        return SharedNoteRepositoryImpl(remoteDataSource,noteDao)
     }
 }
