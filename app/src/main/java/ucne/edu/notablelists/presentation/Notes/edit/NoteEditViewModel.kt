@@ -58,7 +58,8 @@ class NoteEditViewModel @Inject constructor(
 
     private var pollingJob: Job? = null
     private var autoSaveJob: Job? = null
-    private var lastInputTime: Long = 0
+
+    private var isDirty = false
 
     init {
         savedStateHandle.get<String>("noteId")?.let { noteId ->
@@ -79,18 +80,22 @@ class NoteEditViewModel @Inject constructor(
     fun onEvent(event: NoteEditEvent) {
         when (event) {
             is NoteEditEvent.EnteredTitle -> {
+                markAsDirty()
                 _state.update { it.copy(title = event.value) }
                 triggerAutoSave()
             }
             is NoteEditEvent.EnteredDescription -> {
+                markAsDirty()
                 _state.update { it.copy(description = event.value) }
                 triggerAutoSave()
             }
             is NoteEditEvent.EnteredTag -> {
+                markAsDirty()
                 _state.update { it.copy(tag = event.value) }
                 triggerAutoSave()
             }
             is NoteEditEvent.ChangePriority -> {
+                markAsDirty()
                 _state.update { it.copy(priority = event.value) }
                 triggerAutoSave()
             }
@@ -99,16 +104,19 @@ class NoteEditViewModel @Inject constructor(
                 val formattedDate = formatDateTime(localDateTime)
                 val noteId = _state.value.id ?: UUID.randomUUID().toString()
 
+                markAsDirty()
                 _state.update { it.copy(id = noteId, reminder = formattedDate) }
                 scheduleReminderUseCase(noteId, _state.value.title.ifBlank { "Sin Título" }, localDateTime)
                 triggerAutoSave()
             }
             is NoteEditEvent.AddChecklistItem -> {
                 val newItem = ChecklistItem("", false)
+                markAsDirty()
                 _state.update { it.copy(checklist = it.checklist + newItem) }
                 triggerAutoSave()
             }
             is NoteEditEvent.UpdateChecklistItem -> {
+                markAsDirty()
                 _state.update {
                     val updatedList = it.checklist.mapIndexed { index, item ->
                         if (index == event.index) item.copy(text = event.text) else item
@@ -118,6 +126,7 @@ class NoteEditViewModel @Inject constructor(
                 triggerAutoSave()
             }
             is NoteEditEvent.ToggleChecklistItem -> {
+                markAsDirty()
                 _state.update {
                     val updatedList = it.checklist.mapIndexed { index, item ->
                         if (index == event.index) item.copy(isDone = !item.isDone) else item
@@ -127,6 +136,7 @@ class NoteEditViewModel @Inject constructor(
                 triggerAutoSave()
             }
             is NoteEditEvent.RemoveChecklistItem -> {
+                markAsDirty()
                 _state.update {
                     val updatedList = it.checklist.toMutableList().apply { removeAt(event.index) }
                     it.copy(checklist = updatedList)
@@ -134,6 +144,7 @@ class NoteEditViewModel @Inject constructor(
                 triggerAutoSave()
             }
             is NoteEditEvent.ToggleFinished -> {
+                markAsDirty()
                 _state.update { it.copy(isFinished = event.isFinished) }
                 triggerAutoSave()
             }
@@ -151,6 +162,7 @@ class NoteEditViewModel @Inject constructor(
             }
             is NoteEditEvent.ClearReminder -> {
                 _state.value.id?.let { cancelReminderUseCase(it) }
+                markAsDirty()
                 _state.update { it.copy(reminder = null) }
                 triggerAutoSave()
             }
@@ -161,6 +173,7 @@ class NoteEditViewModel @Inject constructor(
                 _state.update { it.copy(isTagSheetOpen = false) }
             }
             is NoteEditEvent.SelectTag -> {
+                markAsDirty()
                 _state.update { it.copy(tag = event.tag, isTagSheetOpen = false) }
                 triggerAutoSave()
             }
@@ -171,6 +184,7 @@ class NoteEditViewModel @Inject constructor(
                     } else {
                         _state.value.availableTags
                     }
+                    markAsDirty()
                     _state.update {
                         it.copy(
                             tag = event.tag,
@@ -215,14 +229,17 @@ class NoteEditViewModel @Inject constructor(
         }
     }
 
-    private fun triggerAutoSave() {
-        lastInputTime = System.currentTimeMillis()
+    private fun markAsDirty() {
+        isDirty = true
+    }
 
+    private fun triggerAutoSave() {
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch {
             delay(1500)
             if (isActive) {
                 saveNoteSilent()
+                isDirty = false
             }
         }
     }
@@ -365,27 +382,32 @@ class NoteEditViewModel @Inject constructor(
         pollingJob?.cancel()
         pollingJob = viewModelScope.launch {
             while (isActive) {
-                delay(5000)
-
-                val timeSinceLastInput = System.currentTimeMillis() - lastInputTime
-                if (timeSinceLastInput > 4000) {
-                    when(val result = getSharedNoteDetailsUseCase(userId, remoteId)) {
-                        is Resource.Success -> {
-                            result.data?.let { n ->
-                                _state.update { state ->
-                                    state.copy(
-                                        title = n.title,
-                                        description = n.description,
-                                        tag = n.tag,
-                                        priority = n.priority,
-                                        isFinished = n.isFinished,
-                                        checklist = parseChecklist(n.checklist)
-                                    )
+                try {
+                    delay(5000)
+                    if (!isDirty) {
+                        when(val result = getSharedNoteDetailsUseCase(userId, remoteId)) {
+                            is Resource.Success -> {
+                                result.data?.let { n ->
+                                    _state.update { state ->
+                                        if (!isDirty) {
+                                            state.copy(
+                                                title = n.title,
+                                                description = n.description,
+                                                tag = n.tag,
+                                                priority = n.priority,
+                                                isFinished = n.isFinished,
+                                                checklist = parseChecklist(n.checklist)
+                                            )
+                                        } else {
+                                            state
+                                        }
+                                    }
                                 }
                             }
+                            else -> {}
                         }
-                        else -> {}
                     }
+                } catch (e: Exception) {
                 }
             }
         }
