@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
@@ -38,7 +39,9 @@ class NotesListViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     private val _errorMessage = MutableStateFlow<String?>(null)
     private val _isRefreshing = MutableStateFlow(false)
-    private val _navigationEvent = MutableStateFlow<List<String?>>(emptyList())
+    private val _uiEvent = Channel<NotesListUiEvent>()
+    val uiEvent = _uiEvent.receiveAsFlow()
+
     private val _showLogoutDialog = MutableStateFlow(false)
     private val _selectedNoteIds = MutableStateFlow<Set<String>>(emptySet())
     private val _showDeleteSelectionDialog = MutableStateFlow(false)
@@ -57,29 +60,28 @@ class NotesListViewModel @Inject constructor(
 
     private val _combinedNotes = combine(_localNotes, _sharedNotes) { local, shared ->
         val localRemoteIds = local.mapNotNull { it.remoteId }.toSet()
-
-        val uniqueShared = shared.filter { sharedNote ->
-            sharedNote.remoteId == null || !localRemoteIds.contains(sharedNote.remoteId)
+        val sharedNotesToAppend = shared.filter {
+            it.remoteId != null && !localRemoteIds.contains(it.remoteId)
         }
 
-        local + uniqueShared
+        local + sharedNotesToAppend
     }
 
     @Suppress("UNCHECKED_CAST")
     val state: StateFlow<NotesListState> = combine(
         _combinedNotes,
+        _sharedNotes,
         _filterState,
         _uiStatusState,
-        _navigationEvent,
         _showLogoutDialog,
         _selectedNoteIds,
         _showDeleteSelectionDialog,
         _pendingRequestCount
     ) { args ->
         val notes = args[0] as List<Note>
-        val filterState = args[1] as Pair<String, NoteFilter>
-        val uiStatusState = args[2] as Triple<Boolean, String?, Boolean>
-        val navEvent = args[3] as List<String?>
+        val sharedSource = args[1] as List<Note>
+        val filterState = args[2] as Pair<String, NoteFilter>
+        val uiStatusState = args[3] as Triple<Boolean, String?, Boolean>
         val showLogout = args[4] as Boolean
         val selectedIds = args[5] as Set<String>
         val showDeleteDialog = args[6] as Boolean
@@ -88,12 +90,18 @@ class NotesListViewModel @Inject constructor(
         val (query, selectedFilter) = filterState
         val (isLoading, errorMessage, _) = uiStatusState
 
+        val sharedRemoteIds = sharedSource.mapNotNull { it.remoteId }.toSet()
+
         val filteredNotes = filterAndSortNotes(notes, query, selectedFilter)
 
         val uiNotes = if (isLoading && notes.isEmpty()) {
             emptyList()
         } else {
-            filteredNotes.map { note -> mapToUiItem(note, selectedIds.contains(note.id)) }
+            filteredNotes.map { note ->
+                val isReallyShared = (note.remoteId != null && sharedRemoteIds.contains(note.remoteId)) ||
+                        (note.userId != null && _currentUserId != null && note.userId != _currentUserId)
+                mapToUiItem(note, selectedIds.contains(note.id), isReallyShared)
+            }
         }
 
         val uiFilters = NoteFilter.entries.map { filter ->
@@ -108,7 +116,6 @@ class NotesListViewModel @Inject constructor(
             filterChips = uiFilters,
             loadingStatus = loadingList,
             errorMessage = errorList,
-            navigateToDetail = navEvent,
             searchQuery = query,
             showLogoutDialog = showLogout,
             selectedNoteIds = selectedIds,
@@ -134,14 +141,13 @@ class NotesListViewModel @Inject constructor(
                 if (_selectedNoteIds.value.isNotEmpty()) {
                     _showDeleteSelectionDialog.value = true
                 } else {
-                    _navigationEvent.value = listOf(null)
+                    sendUiEvent(NotesListUiEvent.NavigateToDetail(null))
                 }
             }
             is NotesListEvent.OnNoteClick -> handleNoteClick(event.id)
             is NotesListEvent.OnNoteLongClick -> handleNoteLongClick(event.id)
             is NotesListEvent.OnSearchQueryChange -> _searchQuery.value = event.query
             is NotesListEvent.OnFilterChange -> _selectedFilter.value = event.filter
-            is NotesListEvent.OnNavigationHandled -> _navigationEvent.value = emptyList()
             is NotesListEvent.OnShowLogoutDialog -> _showLogoutDialog.value = true
             is NotesListEvent.OnDismissLogoutDialog -> _showLogoutDialog.value = false
             NotesListEvent.OnDeleteSelectedNotes -> deleteSelectedNotes()
@@ -155,7 +161,7 @@ class NotesListViewModel @Inject constructor(
         if (_selectedNoteIds.value.isNotEmpty()) {
             toggleSelection(id)
         } else {
-            _navigationEvent.value = listOf(id)
+            sendUiEvent(NotesListUiEvent.NavigateToDetail(id))
         }
     }
 
@@ -172,7 +178,7 @@ class NotesListViewModel @Inject constructor(
         }
     }
 
-    private fun mapToUiItem(note: Note, isSelected: Boolean): NoteUiItem {
+    private fun mapToUiItem(note: Note, isSelected: Boolean, isShared: Boolean): NoteUiItem {
         val style = when (note.priority) {
             2 -> NoteStyle.Error
             1 -> NoteStyle.Primary
@@ -195,8 +201,6 @@ class NotesListViewModel @Inject constructor(
         } else {
             emptyList()
         }
-
-        val isShared = note.userId != null && _currentUserId != null && note.userId != _currentUserId
 
         return NoteUiItem(
             id = note.id,
@@ -233,8 +237,6 @@ class NotesListViewModel @Inject constructor(
 
                 when (val apiResult = fetchUserNotesUseCase(userId)) {
                     is Resource.Success -> {
-                        apiResult.data?.let { apiNotes ->
-                        }
                     }
                     is Resource.Error -> {}
                     else -> {}
@@ -256,7 +258,6 @@ class NotesListViewModel @Inject constructor(
                     delay(5000)
                     checkPendingRequests(userId)
                     fetchSharedNotes(userId)
-                    fetchUserNotesUseCase(userId)
                 } catch (e: Exception) {
                 }
             }
@@ -300,6 +301,10 @@ class NotesListViewModel @Inject constructor(
             NoteFilter.HIGH_PRIORITY -> filtered.filter { it.priority == 2 }
             NoteFilter.MEDIUM_PRIORITY -> filtered.filter { it.priority == 1 }
             NoteFilter.LOW_PRIORITY -> filtered.filter { it.priority == 0 }
+            NoteFilter.SHARED -> filtered.filter { note ->
+                (note.remoteId != null && _sharedNotes.value.any { it.remoteId == note.remoteId }) ||
+                        (note.userId != null && _currentUserId != null && note.userId != _currentUserId)
+            }
         }
     }
 
@@ -350,6 +355,12 @@ class NotesListViewModel @Inject constructor(
                 }
             }
             _isRefreshing.value = false
+        }
+    }
+
+    private fun sendUiEvent(event: NotesListUiEvent) {
+        viewModelScope.launch {
+            _uiEvent.send(event)
         }
     }
 }

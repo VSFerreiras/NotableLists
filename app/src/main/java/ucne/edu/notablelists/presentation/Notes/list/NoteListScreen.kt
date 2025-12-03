@@ -12,8 +12,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -44,12 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import ucne.edu.notablelists.presentation.Notes.list.*
 import ucne.edu.notablelists.presentation.users.UserEvent
@@ -76,10 +71,11 @@ fun NotesListRoute(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val userState by userViewModel.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(state.navigateToDetail) {
-        state.navigateToDetail.forEach { noteId ->
-            onNavigateToDetail(noteId)
-            viewModel.onEvent(NotesListEvent.OnNavigationHandled)
+    LaunchedEffect(key1 = true) {
+        viewModel.uiEvent.collectLatest { event ->
+            when (event) {
+                is NotesListUiEvent.NavigateToDetail -> onNavigateToDetail(event.noteId)
+            }
         }
     }
 
@@ -108,24 +104,9 @@ fun NotesListScreen(
     onNavigateToFriends: () -> Unit
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
-    var isFabVisible by remember { mutableStateOf(true) }
     val focusManager = LocalFocusManager.current
-
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (available.y < -5f) {
-                    isFabVisible = false
-                } else if (available.y > 5f) {
-                    isFabVisible = true
-                }
-                return Offset.Zero
-            }
-        }
-    }
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage.forEach { error ->
@@ -184,7 +165,6 @@ fun NotesListScreen(
 
     Scaffold(
         modifier = Modifier
-            .nestedScroll(nestedScrollConnection)
             .pointerInput(Unit) {
                 detectTapGestures(onTap = {
                     focusManager.clearFocus()
@@ -201,34 +181,28 @@ fun NotesListScreen(
                 label = "fabContent"
             )
 
-            AnimatedVisibility(
-                visible = isFabVisible || state.isSelectionMode,
-                enter = scaleIn() + fadeIn(),
-                exit = scaleOut() + fadeOut()
-            ) {
-                ExtendedFloatingActionButton(
-                    onClick = { onEvent(NotesListEvent.OnAddNoteClick) },
-                    containerColor = fabContainerColor,
-                    contentColor = fabContentColor,
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
-                    expanded = state.isSelectionMode,
-                    icon = {
-                        AnimatedContent(
-                            targetState = state.isSelectionMode,
-                            transitionSpec = { scaleIn() togetherWith scaleOut() },
-                            label = "fabIcon"
-                        ) { isSelectionMode ->
-                            if (isSelectionMode) {
-                                Icon(imageVector = Icons.Default.Delete, contentDescription = "Eliminar seleccionados")
-                            } else {
-                                Icon(imageVector = Icons.Default.Add, contentDescription = "Crear nota")
-                            }
+            ExtendedFloatingActionButton(
+                onClick = { onEvent(NotesListEvent.OnAddNoteClick) },
+                containerColor = fabContainerColor,
+                contentColor = fabContentColor,
+                shape = RoundedCornerShape(16.dp),
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
+                expanded = state.isSelectionMode,
+                icon = {
+                    AnimatedContent(
+                        targetState = state.isSelectionMode,
+                        transitionSpec = { scaleIn() togetherWith scaleOut() },
+                        label = "fabIcon"
+                    ) { isSelectionMode ->
+                        if (isSelectionMode) {
+                            Icon(imageVector = Icons.Default.Delete, contentDescription = "Eliminar seleccionados")
+                        } else {
+                            Icon(imageVector = Icons.Default.Add, contentDescription = "Crear nota")
                         }
-                    },
-                    text = { Text("Eliminar") }
-                )
-            }
+                    }
+                },
+                text = { Text("Eliminar") }
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
