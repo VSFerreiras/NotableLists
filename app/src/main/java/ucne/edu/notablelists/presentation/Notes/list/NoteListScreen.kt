@@ -1,40 +1,18 @@
 package ucne.edu.notablelists.presentation.notes_list
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.shape.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.ExitToApp
-import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -58,7 +36,6 @@ import ucne.edu.notablelists.presentation.Notes.list.*
 import ucne.edu.notablelists.presentation.users.UserEvent
 import ucne.edu.notablelists.presentation.users.UserState
 import ucne.edu.notablelists.presentation.users.UserViewModel
-import ucne.edu.notablelists.ui.theme.NotableListsTheme
 
 @Composable
 fun NotesListRoute(
@@ -72,15 +49,16 @@ fun NotesListRoute(
     val userState by userViewModel.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(key1 = true) {
-        viewModel.uiEvent.collectLatest { event ->
-            when (event) {
-                is NotesListUiEvent.NavigateToDetail -> onNavigateToDetail(event.noteId)
+        viewModel.sideEffect.collectLatest { effect ->
+            when (effect) {
+                is NotesListSideEffect.NavigateToDetail -> onNavigateToDetail(effect.noteId)
+                is NotesListSideEffect.NavigateToLogin -> onNavigateToLogin()
             }
         }
     }
 
     BackHandler(enabled = state.isSelectionMode) {
-        viewModel.onEvent(NotesListEvent.OnClearSelection)
+        viewModel.onEvent(NotesListEvent.SelectionCleared)
     }
 
     NotesListScreen(
@@ -93,7 +71,7 @@ fun NotesListRoute(
     )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NotesListScreen(
     state: NotesListState,
@@ -110,14 +88,12 @@ fun NotesListScreen(
     var lastClickTime by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(state.errorMessage) {
-        state.errorMessage.forEach { error ->
-            snackbarHostState.showSnackbar(error)
-        }
+        state.errorMessage?.let { snackbarHostState.showSnackbar(it) }
     }
 
     if (state.showLogoutDialog) {
         AlertDialog(
-            onDismissRequest = { onEvent(NotesListEvent.OnDismissLogoutDialog) },
+            onDismissRequest = { onEvent(NotesListEvent.LogoutDismissed) },
             icon = { Icon(Icons.Outlined.ExitToApp, contentDescription = null) },
             title = { Text("Cerrar Sesión") },
             text = { Text("¿Seguro quieres cerrar sesión en NotableLists?") },
@@ -125,52 +101,37 @@ fun NotesListScreen(
                 Button(
                     onClick = {
                         onUserEvent(UserEvent.Logout)
-                        onEvent(NotesListEvent.OnDismissLogoutDialog)
+                        onEvent(NotesListEvent.LogoutConfirmed)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Cerrar Sesión")
-                }
+                ) { Text("Cerrar Sesión") }
             },
             dismissButton = {
-                TextButton(
-                    onClick = { onEvent(NotesListEvent.OnDismissLogoutDialog) }
-                ) {
-                    Text("Cancelar")
-                }
+                TextButton(onClick = { onEvent(NotesListEvent.LogoutDismissed) }) { Text("Cancelar") }
             }
         )
     }
 
     if (state.showDeleteSelectionDialog) {
         AlertDialog(
-            onDismissRequest = { onEvent(NotesListEvent.OnDismissDeleteSelectionDialog) },
+            onDismissRequest = { onEvent(NotesListEvent.DeleteSelectedDismissed) },
             icon = { Icon(Icons.Default.Delete, contentDescription = null) },
             title = { Text("Eliminar notas") },
             text = { Text("¿Deseas eliminar las ${state.selectedNoteIds.size} notas seleccionadas?") },
             confirmButton = {
                 TextButton(
-                    onClick = { onEvent(NotesListEvent.OnDeleteSelectedNotes) },
+                    onClick = { onEvent(NotesListEvent.DeleteSelectedConfirmed) },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Eliminar")
-                }
+                ) { Text("Eliminar") }
             },
             dismissButton = {
-                TextButton(onClick = { onEvent(NotesListEvent.OnDismissDeleteSelectionDialog) }) {
-                    Text("Cancelar")
-                }
+                TextButton(onClick = { onEvent(NotesListEvent.DeleteSelectedDismissed) }) { Text("Cancelar") }
             }
         )
     }
 
     Scaffold(
-        modifier = Modifier
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = {
-                    focusManager.clearFocus()
-                })
-            },
+        modifier = Modifier.pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) },
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             val fabContainerColor by animateColorAsState(
@@ -187,7 +148,7 @@ fun NotesListScreen(
                     val currentTime = System.currentTimeMillis()
                     if (currentTime - lastClickTime > 500) {
                         lastClickTime = currentTime
-                        onEvent(NotesListEvent.OnAddNoteClick)
+                        onEvent(NotesListEvent.AddNoteClicked)
                     }
                 },
                 containerColor = fabContainerColor,
@@ -201,11 +162,7 @@ fun NotesListScreen(
                         transitionSpec = { scaleIn() togetherWith scaleOut() },
                         label = "fabIcon"
                     ) { isSelectionMode ->
-                        if (isSelectionMode) {
-                            Icon(imageVector = Icons.Default.Delete, contentDescription = "Eliminar seleccionados")
-                        } else {
-                            Icon(imageVector = Icons.Default.Add, contentDescription = "Crear nota")
-                        }
+                        if (isSelectionMode) Icon(Icons.Default.Delete, "Eliminar") else Icon(Icons.Default.Add, "Crear")
                     }
                 },
                 text = { Text("Eliminar") }
@@ -213,15 +170,10 @@ fun NotesListScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp)
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp)
         ) {
             Spacer(modifier = Modifier.height(12.dp))
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -229,33 +181,26 @@ fun NotesListScreen(
             ) {
                 CustomSearchBar(
                     query = state.searchQuery,
-                    onQueryChange = { onEvent(NotesListEvent.OnSearchQueryChange(it)) },
+                    onQueryChange = { onEvent(NotesListEvent.SearchQueryChanged(it)) },
                     modifier = Modifier.weight(1f)
                 )
-
                 UserAvatarMenu(
                     currentUser = userState.currentUser,
                     pendingRequestCount = state.pendingRequestCount,
-                    onLogoutClick = { onEvent(NotesListEvent.OnShowLogoutDialog) },
+                    onLogoutClick = { onEvent(NotesListEvent.LogoutClicked) },
                     onLoginClick = onNavigateToLogin,
                     onFriendsClick = onNavigateToFriends
                 )
             }
-
             Spacer(modifier = Modifier.height(24.dp))
-
             FilterChipsSection(
                 filters = state.filterChips,
                 onFilterSelected = {
-                    onEvent(NotesListEvent.OnFilterChange(it))
-                    scope.launch {
-                        listState.animateScrollToItem(0)
-                    }
+                    onEvent(NotesListEvent.FilterChanged(it))
+                    scope.launch { listState.animateScrollToItem(0) }
                 }
             )
-
             Spacer(modifier = Modifier.height(16.dp))
-
             Box(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
                     state = listState,
@@ -263,20 +208,13 @@ fun NotesListScreen(
                     contentPadding = PaddingValues(bottom = 88.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(state.loadingStatus) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularWavyProgressIndicator(
-                                modifier = Modifier.size(48.dp),
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                    if (state.isLoading && state.notes.isEmpty()) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                                CircularWavyProgressIndicator(modifier = Modifier.size(48.dp), color = MaterialTheme.colorScheme.primary)
+                            }
                         }
                     }
-
                     items(state.notes, key = { it.id }) { noteUi ->
                         NoteItemCard(
                             noteUi = noteUi,
@@ -285,17 +223,14 @@ fun NotesListScreen(
                                 val currentTime = System.currentTimeMillis()
                                 if (currentTime - lastClickTime > 500) {
                                     lastClickTime = currentTime
-                                    onEvent(NotesListEvent.OnNoteClick(noteUi.id))
+                                    onEvent(NotesListEvent.NoteClicked(noteUi.id))
                                 }
                             },
-                            onLongClick = { onEvent(NotesListEvent.OnNoteLongClick(noteUi.id)) }
+                            onLongClick = { onEvent(NotesListEvent.NoteLongClicked(noteUi.id)) }
                         )
                     }
-
-                    if (!state.loadingStatus.isNotEmpty() && state.notes.isEmpty()) {
-                        item {
-                            EmptyStateMessage()
-                        }
+                    if (!state.isLoading && state.notes.isEmpty()) {
+                        item { EmptyStateMessage() }
                     }
                 }
             }
@@ -304,32 +239,59 @@ fun NotesListScreen(
 }
 
 @Composable
-fun EmptyStateMessage() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 64.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.NoteAlt,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.surfaceVariant
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "No hay notas aún",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = "Crea una nueva nota para empezar",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-        )
-    }
+fun CustomSearchBar(
+    modifier: Modifier = Modifier,
+    query: String,
+    onQueryChange: (String) -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+
+    val cornerRadius by animateDpAsState(
+        targetValue = if (isFocused) 28.dp else 16.dp,
+        label = "searchBarShape"
+    )
+
+    val containerColor by animateColorAsState(
+        targetValue = if (isFocused) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
+        label = "searchBarColor"
+    )
+
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = modifier
+            .height(56.dp)
+            .onFocusChanged { isFocused = it.isFocused },
+        shape = RoundedCornerShape(cornerRadius),
+        placeholder = {
+            Text(
+                "Buscar notas...",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = containerColor,
+            unfocusedContainerColor = containerColor,
+            focusedBorderColor = Color.Transparent,
+            unfocusedBorderColor = Color.Transparent,
+            cursorColor = MaterialTheme.colorScheme.primary
+        ),
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyLarge,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = {
+            focusManager.clearFocus()
+        })
+    )
 }
 
 @Composable
@@ -345,17 +307,16 @@ fun UserAvatarMenu(
 
     val cornerRadius by animateDpAsState(
         targetValue = if (expanded) 16.dp else 50.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "avatarShape"
     )
 
     val containerColor by animateColorAsState(
-        targetValue = if (expanded) MaterialTheme.colorScheme.primaryContainer else if (isLoggedIn) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+        targetValue = if (expanded || isLoggedIn) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
         label = "avatarColor"
     )
 
     val contentColor by animateColorAsState(
-        targetValue = if (expanded) MaterialTheme.colorScheme.onPrimaryContainer else if (isLoggedIn) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = if (expanded || isLoggedIn) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
         label = "avatarContentColor"
     )
 
@@ -375,7 +336,6 @@ fun UserAvatarMenu(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold
                     )
-
                     if (pendingRequestCount > 0) {
                         Box(
                             modifier = Modifier
@@ -478,63 +438,6 @@ fun UserAvatarMenu(
 }
 
 @Composable
-fun CustomSearchBar(
-    modifier: Modifier = Modifier,
-    query: String,
-    onQueryChange: (String) -> Unit
-) {
-    var isFocused by remember { mutableStateOf(false) }
-    val focusManager = LocalFocusManager.current
-
-    val cornerRadius by animateDpAsState(
-        targetValue = if (isFocused) 28.dp else 16.dp,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
-        label = "searchBarShape"
-    )
-
-    val containerColor by animateColorAsState(
-        targetValue = if (isFocused) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
-        label = "searchBarColor"
-    )
-
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        modifier = modifier
-            .height(56.dp)
-            .onFocusChanged { isFocused = it.isFocused },
-        shape = RoundedCornerShape(cornerRadius),
-        placeholder = {
-            Text(
-                "Buscar notas...",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        },
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = containerColor,
-            unfocusedContainerColor = containerColor,
-            focusedBorderColor = Color.Transparent,
-            unfocusedBorderColor = Color.Transparent,
-            cursorColor = MaterialTheme.colorScheme.primary
-        ),
-        singleLine = true,
-        textStyle = MaterialTheme.typography.bodyLarge,
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = {
-            focusManager.clearFocus()
-        })
-    )
-}
-
-@Composable
 fun FilterChipsSection(
     filters: List<FilterUiItem>,
     onFilterSelected: (NoteFilter) -> Unit
@@ -585,7 +488,6 @@ fun NoteItemCard(
 
     val scale by animateFloatAsState(
         targetValue = if (noteUi.isSelected) 0.95f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "scale"
     )
 
@@ -691,9 +593,9 @@ fun NoteItemCard(
                         )
                     }
 
-                    noteUi.reminder?.let { reminder ->
+                    if (!noteUi.reminder.isNullOrBlank()) {
                         MetaDataChip(
-                            text = reminder,
+                            text = noteUi.reminder,
                             icon = Icons.Default.Alarm,
                             contentColor = contentColor,
                             containerColor = contentColor.copy(alpha = 0.1f)
@@ -751,6 +653,35 @@ fun MetaDataChip(
                 color = contentColor
             )
         }
+    }
+}
+
+@Composable
+fun EmptyStateMessage() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 64.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.NoteAlt,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.surfaceVariant
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "No hay notas aún",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "Crea una nueva nota para empezar",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        )
     }
 }
 
