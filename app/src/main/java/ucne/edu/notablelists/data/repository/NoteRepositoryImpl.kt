@@ -50,6 +50,14 @@ class NoteRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteLocalOnly(id: String) {
+        try {
+            localDataSource.delete(id)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     override suspend fun delete(id: String): Resource<Unit> {
         return try {
             val noteEntity = localDataSource.getNote(id) ?: return Resource.Error("Nota no encontrada")

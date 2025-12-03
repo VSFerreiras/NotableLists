@@ -23,8 +23,10 @@ import ucne.edu.notablelists.domain.notes.usecase.*
 import ucne.edu.notablelists.domain.notification.CancelReminderUseCase
 import ucne.edu.notablelists.domain.notification.ScheduleReminderUseCase
 import ucne.edu.notablelists.domain.session.usecase.GetUserIdUseCase
+import ucne.edu.notablelists.domain.sharednote.usecase.GetAllSharedNotesUseCase
 import ucne.edu.notablelists.domain.sharednote.usecase.GetSharedNoteDetailsUseCase
 import ucne.edu.notablelists.domain.sharednote.usecase.ShareNoteUseCase
+import ucne.edu.notablelists.domain.sharednote.usecase.UpdateSharedNoteStatusUseCase
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -47,6 +49,8 @@ class NoteEditViewModel @Inject constructor(
     private val shareNoteUseCase: ShareNoteUseCase,
     private val getSharedNoteDetailsUseCase: GetSharedNoteDetailsUseCase,
     private val getRemoteUserNoteUseCase: GetRemoteUserNoteUseCase,
+    private val updateSharedNoteStatusUseCase: UpdateSharedNoteStatusUseCase,
+    private val getAllSharedNotesUseCase: GetAllSharedNotesUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -168,7 +172,7 @@ class NoteEditViewModel @Inject constructor(
     private fun scheduleAutoSave() {
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch {
-            delay(2000)
+            delay(1500)
             if (isActive) {
                 try {
                     saveNoteSilent()
@@ -266,7 +270,7 @@ class NoteEditViewModel @Inject constructor(
         pollingJob?.cancel()
         pollingJob = viewModelScope.launch {
             while (isActive) {
-                delay(5000)
+                delay(2000)
                 if (!isDirty) {
                     fetchLatestRemoteData(currentUserId, remoteId, isOwner)
                 }
@@ -373,10 +377,39 @@ class NoteEditViewModel @Inject constructor(
 
     private fun leaveSharedNote() {
         viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            val userId = _state.value.currentUserId ?: return@launch
+            val remoteId = _state.value.remoteId
             val id = _state.value.id
-            if (id != null) {
-                deleteNoteUseCase(id)
-                _state.update { it.copy(showDeleteDialog = false) }
+
+            if (remoteId != null) {
+
+                val allShared = getAllSharedNotesUseCase(userId)
+
+                if (allShared is Resource.Success) {
+                    val sharedWithMe = allShared.data?.first ?: emptyList()
+                    val targetShare = sharedWithMe.find { it.noteId == remoteId }
+
+                    if (targetShare != null) {
+                        val result = updateSharedNoteStatusUseCase(userId, targetShare.sharedNoteId)
+                        if (result is Resource.Success) {
+                            if (id != null) {
+                                noteRepository.deleteLocalOnly(id)
+                            }
+                            _state.update { it.copy(showDeleteDialog = false, isLoading = false) }
+                            sendUiEvent(NoteEditUiEvent.NavigateBack)
+                        } else {
+                            _state.update { it.copy(errorMessage = result.message, showDeleteDialog = false, isLoading = false) }
+                        }
+                    } else {
+                        _state.update { it.copy(errorMessage = "No se encontró la información de la nota compartida", showDeleteDialog = false, isLoading = false) }
+                    }
+                } else {
+                    _state.update { it.copy(errorMessage = "Error al obtener datos compartidos", showDeleteDialog = false, isLoading = false) }
+                }
+            } else {
+                if (id != null) deleteNoteUseCase(id)
+                _state.update { it.copy(showDeleteDialog = false, isLoading = false) }
                 sendUiEvent(NoteEditUiEvent.NavigateBack)
             }
         }

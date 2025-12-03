@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -297,7 +298,8 @@ fun NoteEditScreen(
                 onDeleteClick = {
                     viewModel.onEvent(NoteEditEvent.ShowDeleteDialog)
                     isMenuExpanded = false
-                }
+                },
+                isOwner = state.isOwner
             )
         }
     ) { paddingValues ->
@@ -603,7 +605,8 @@ fun FabMenu(
     onChecklistClick: () -> Unit,
     onTagClick: () -> Unit,
     onShareClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    isOwner: Boolean
 ) {
     val rotation by animateFloatAsState(targetValue = if (expanded) 135f else 0f, label = "fab_rotation")
 
@@ -625,7 +628,12 @@ fun FabMenu(
                 FabMenuItem(Icons.Default.Label, "Etiqueta", onTagClick)
                 FabMenuItem(Icons.Default.Share, "Compartir", onShareClick)
                 FabMenuItem(Icons.Default.Checklist, "Lista", onChecklistClick)
-                FabMenuItem(Icons.Default.Delete, "Eliminar", onDeleteClick, MaterialTheme.colorScheme.errorContainer)
+
+                if (isOwner) {
+                    FabMenuItem(Icons.Default.Delete, "Eliminar", onDeleteClick, MaterialTheme.colorScheme.errorContainer)
+                } else {
+                    FabMenuItem(Icons.AutoMirrored.Filled.ExitToApp, "Salir", onDeleteClick, MaterialTheme.colorScheme.errorContainer)
+                }
             }
         }
 
@@ -747,7 +755,7 @@ fun NoteEditScreen_ComponentsPreview() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             TransparentHintTextField(
-                text = "Meeting Notes",
+                text = "Notas del proyecto",
                 hint = "Título",
                 onValueChange = {},
                 textStyle = MaterialTheme.typography.displaySmall
@@ -756,7 +764,7 @@ fun NoteEditScreen_ComponentsPreview() {
             FlowRowChips(
                 state = NoteEditState(
                     priority = 2,
-                    tag = "work",
+                    tag = "ap2",
                     reminder = "2024-01-15 14:30"
                 ),
                 onRemoveReminder = {},
@@ -765,13 +773,13 @@ fun NoteEditScreen_ComponentsPreview() {
 
             Column {
                 ChecklistItemRow(
-                    item = ChecklistItem("Prepare slides", false),
+                    item = ChecklistItem("Presenta el proyecto", false),
                     onTextChange = {},
                     onToggle = {},
                     onRemove = {}
                 )
                 ChecklistItemRow(
-                    item = ChecklistItem("Review metrics", true),
+                    item = ChecklistItem("pasa la materia", true),
                     onTextChange = {},
                     onToggle = {},
                     onRemove = {}
@@ -779,7 +787,7 @@ fun NoteEditScreen_ComponentsPreview() {
             }
 
             TransparentHintTextField(
-                text = "Discussed project timeline and deliverables with the team...",
+                text = "Hola profe",
                 hint = "Escribe algo...",
                 onValueChange = {},
                 textStyle = MaterialTheme.typography.bodyLarge

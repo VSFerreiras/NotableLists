@@ -21,4 +21,5 @@ interface NoteRepository {
     suspend fun clearLocalNotes()
     suspend fun getRemoteNote(noteId: Int): Resource<Note>
     suspend fun getRemoteUserNote(userId: Int, noteId: Int): Resource<Note>
+    suspend fun deleteLocalOnly(id: String)
 }
