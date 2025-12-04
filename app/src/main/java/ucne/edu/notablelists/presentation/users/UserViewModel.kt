@@ -9,8 +9,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import ucne.edu.notablelists.data.remote.Resource
-import ucne.edu.notablelists.domain.auth.AuthRepository
-import ucne.edu.notablelists.domain.notes.repository.NoteRepository
 import ucne.edu.notablelists.domain.notes.usecase.ClearLocalNotesUseCase
 import ucne.edu.notablelists.domain.session.usecase.ClearSessionUseCase
 import ucne.edu.notablelists.domain.session.usecase.GetSessionUseCase
@@ -52,8 +50,10 @@ class UserViewModel @Inject constructor(
 
     fun onEvent(event: UserEvent) {
         when (event) {
-            UserEvent.CreateUser -> createUser()
-            UserEvent.LoginUser -> loginUser()
+            UserEvent.SwitchToLoginMode -> setupLoginMode()
+            UserEvent.SwitchToRegisterMode -> setupRegisterMode()
+            UserEvent.SubmitAuth -> if (_state.value.isLoginMode) loginUser() else createUser()
+            UserEvent.AuthFooterClicked -> handleFooterClick()
             UserEvent.Logout -> logout()
             UserEvent.ClearError -> clearError()
             UserEvent.ClearSuccess -> clearSuccess()
@@ -61,6 +61,51 @@ class UserViewModel @Inject constructor(
             is UserEvent.PasswordChanged -> passwordChanged(event.value)
             UserEvent.ShowSkipDialog -> _state.update { it.copy(showSkipDialog = true) }
             UserEvent.DismissSkipDialog -> _state.update { it.copy(showSkipDialog = false) }
+            UserEvent.NavigationHandled -> _state.update { it.copy(navigationEvent = null) }
+        }
+    }
+
+    private fun setupLoginMode() {
+        _state.update {
+            it.copy(
+                isLoginMode = true,
+                authTitlePrefix = "Hola de nuevo,\n",
+                authTitleAction = "Inicia Sesión",
+                authSubtitle = "Sincroniza tus notas en cualquier lugar.",
+                authButtonText = "Iniciar Sesión",
+                authFooterQuestion = "¿No tienes cuenta? ",
+                authFooterAction = "Regístrate aquí",
+                authSkipDialogText = "Si usas la aplicación sin iniciar sesión podrías perder tus notas.",
+                error = null,
+                usernameError = null,
+                passwordError = null
+            )
+        }
+    }
+
+    private fun setupRegisterMode() {
+        _state.update {
+            it.copy(
+                isLoginMode = false,
+                authTitlePrefix = "Bienvenido,\n",
+                authTitleAction = "Crea tu cuenta",
+                authSubtitle = "Únete para guardar tus notas en la nube.",
+                authButtonText = "Registrarse",
+                authFooterQuestion = "¿Ya tienes cuenta? ",
+                authFooterAction = "Inicia Sesión",
+                authSkipDialogText = "Si usas la aplicación sin cuenta podrías perder tus notas.",
+                error = null,
+                usernameError = null,
+                passwordError = null
+            )
+        }
+    }
+
+    private fun handleFooterClick() {
+        if (_state.value.isLoginMode) {
+            _state.update { it.copy(navigationEvent = UserSideEffect.NavigateToRegister) }
+        } else {
+            _state.update { it.copy(navigationEvent = UserSideEffect.NavigateToLogin) }
         }
     }
 
@@ -74,7 +119,7 @@ class UserViewModel @Inject constructor(
         }
     }
 
-    fun passwordChanged(password: String) {
+    private fun passwordChanged(password: String) {
         _state.update {
             it.copy(
                 password = password,
@@ -117,7 +162,8 @@ class UserViewModel @Inject constructor(
                                 username = "",
                                 password = "",
                                 currentUser = username,
-                                currentUserId = userId
+                                currentUserId = userId,
+                                navigationEvent = UserSideEffect.NavigateToProfile
                             )
                         }
                     }
@@ -172,7 +218,8 @@ class UserViewModel @Inject constructor(
                                 username = "",
                                 password = "",
                                 currentUser = username,
-                                currentUserId = userId
+                                currentUserId = userId,
+                                navigationEvent = UserSideEffect.NavigateToProfile
                             )
                         }
                     }
@@ -243,7 +290,8 @@ class UserViewModel @Inject constructor(
                     password = "",
                     currentUser = "",
                     currentUserId = null,
-                    isSessionChecked = true
+                    isSessionChecked = true,
+                    navigationEvent = UserSideEffect.NavigateToLogin
                 )
             }
         }
