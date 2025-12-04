@@ -18,4 +18,5 @@ sealed interface NotesListEvent {
     data object DeleteSelectedConfirmed : NotesListEvent
     data object DeleteSelectedDismissed : NotesListEvent
     data object SelectionCleared : NotesListEvent
+    data object NavigationHandled : NotesListEvent
 }

@@ -27,4 +27,5 @@ sealed interface NoteEditEvent {
     data object DialogDismissed : NoteEditEvent
     data object LoginClicked : NoteEditEvent
     data object FriendsClicked : NoteEditEvent
+    data object NavigationHandled : NoteEditEvent
 }

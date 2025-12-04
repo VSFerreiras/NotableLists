@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.flow.collectLatest
 import ucne.edu.notablelists.domain.friends.model.Friend
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -83,12 +82,16 @@ fun NoteEditScreen(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        viewModel.sideEffect.collectLatest { effect ->
+    }
+
+    LaunchedEffect(state.navigationEvent) {
+        state.navigationEvent?.let { effect ->
             when (effect) {
                 is NoteEditSideEffect.NavigateBack -> onNavigateBack()
                 is NoteEditSideEffect.NavigateToLogin -> onNavigateToLogin()
                 is NoteEditSideEffect.NavigateToFriends -> onNavigateToFriends()
             }
+            viewModel.onEvent(NoteEditEvent.NavigationHandled)
         }
     }
 

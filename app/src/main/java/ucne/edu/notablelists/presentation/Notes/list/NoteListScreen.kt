@@ -30,7 +30,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import ucne.edu.notablelists.presentation.Notes.list.*
 import ucne.edu.notablelists.presentation.users.UserEvent
@@ -48,12 +47,13 @@ fun NotesListRoute(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val userState by userViewModel.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(key1 = true) {
-        viewModel.sideEffect.collectLatest { effect ->
+    LaunchedEffect(state.navigationEvent) {
+        state.navigationEvent?.let { effect ->
             when (effect) {
                 is NotesListSideEffect.NavigateToDetail -> onNavigateToDetail(effect.noteId)
                 is NotesListSideEffect.NavigateToLogin -> onNavigateToLogin()
             }
+            viewModel.onEvent(NotesListEvent.NavigationHandled)
         }
     }
 

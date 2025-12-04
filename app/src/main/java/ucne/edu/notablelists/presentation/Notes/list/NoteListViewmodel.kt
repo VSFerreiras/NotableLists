@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -37,9 +36,6 @@ class NotesListViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(NotesListState())
     val state = _state.asStateFlow()
-
-    private val _sideEffect = Channel<NotesListSideEffect>()
-    val sideEffect = _sideEffect.receiveAsFlow()
 
     private var pollingJob: Job? = null
     private var _currentUserId: Int? = null
@@ -91,6 +87,7 @@ class NotesListViewModel @Inject constructor(
             is NotesListEvent.DeleteSelectedConfirmed -> deleteSelectedNotes()
             is NotesListEvent.DeleteSelectedDismissed -> _state.update { it.copy(showDeleteSelectionDialog = false) }
             is NotesListEvent.SelectionCleared -> _state.update { it.copy(selectedNoteIds = emptySet()) }
+            is NotesListEvent.NavigationHandled -> _state.update { it.copy(navigationEvent = null) }
         }
     }
 
@@ -98,7 +95,7 @@ class NotesListViewModel @Inject constructor(
         if (_state.value.isSelectionMode) {
             _state.update { it.copy(showDeleteSelectionDialog = true) }
         } else {
-            viewModelScope.launch { _sideEffect.send(NotesListSideEffect.NavigateToDetail(null)) }
+            _state.update { it.copy(navigationEvent = NotesListSideEffect.NavigateToDetail(null)) }
         }
     }
 
@@ -106,7 +103,7 @@ class NotesListViewModel @Inject constructor(
         if (_state.value.isSelectionMode) {
             toggleSelection(id)
         } else {
-            viewModelScope.launch { _sideEffect.send(NotesListSideEffect.NavigateToDetail(id)) }
+            _state.update { it.copy(navigationEvent = NotesListSideEffect.NavigateToDetail(id)) }
         }
     }
 

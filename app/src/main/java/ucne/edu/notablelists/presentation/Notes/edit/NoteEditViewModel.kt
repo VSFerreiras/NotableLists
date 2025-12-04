@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -19,7 +18,6 @@ import ucne.edu.notablelists.domain.notification.ScheduleReminderUseCase
 import ucne.edu.notablelists.domain.session.usecase.GetUserIdUseCase
 import ucne.edu.notablelists.domain.sharednote.usecase.*
 import java.time.Instant
-import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
@@ -47,9 +45,6 @@ class NoteEditViewModel @Inject constructor(
 
     private val _state = MutableStateFlow(NoteEditState())
     val state = _state.asStateFlow()
-
-    private val _sideEffect = Channel<NoteEditSideEffect>()
-    val sideEffect = _sideEffect.receiveAsFlow()
 
     private var autoSaveJob: Job? = null
     private var pollingJob: Job? = null
@@ -92,8 +87,15 @@ class NoteEditViewModel @Inject constructor(
             is NoteEditEvent.RemoveCollaboratorRequested -> _state.update { it.copy(collaboratorPendingRemoval = event.collaborator, isCollaboratorMenuExpanded = false) }
             is NoteEditEvent.RemoveCollaboratorConfirmed -> removeCollaborator()
             is NoteEditEvent.DialogDismissed -> dismissDialogs()
-            is NoteEditEvent.LoginClicked -> { dismissDialogs(); viewModelScope.launch { _sideEffect.send(NoteEditSideEffect.NavigateToLogin) } }
-            is NoteEditEvent.FriendsClicked -> { dismissDialogs(); viewModelScope.launch { _sideEffect.send(NoteEditSideEffect.NavigateToFriends) } }
+            is NoteEditEvent.LoginClicked -> {
+                dismissDialogs()
+                _state.update { it.copy(navigationEvent = NoteEditSideEffect.NavigateToLogin) }
+            }
+            is NoteEditEvent.FriendsClicked -> {
+                dismissDialogs()
+                _state.update { it.copy(navigationEvent = NoteEditSideEffect.NavigateToFriends) }
+            }
+            is NoteEditEvent.NavigationHandled -> _state.update { it.copy(navigationEvent = null) }
         }
     }
 
@@ -191,7 +193,7 @@ class NoteEditViewModel @Inject constructor(
     private fun saveAndExit() {
         viewModelScope.launch {
             if (isDirty) saveNoteSilent()
-            _sideEffect.send(NoteEditSideEffect.NavigateBack)
+            _state.update { it.copy(navigationEvent = NoteEditSideEffect.NavigateBack) }
         }
     }
 
@@ -208,7 +210,7 @@ class NoteEditViewModel @Inject constructor(
                     noteRepository.deleteLocalOnly(id)
                 }
             }
-            _sideEffect.send(NoteEditSideEffect.NavigateBack)
+            _state.update { it.copy(navigationEvent = NoteEditSideEffect.NavigateBack) }
         }
     }
 

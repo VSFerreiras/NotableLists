@@ -27,7 +27,8 @@ data class NoteEditState(
     val isLoginRequiredDialogVisible: Boolean = false,
     val isNoFriendsDialogVisible: Boolean = false,
     val isCollaboratorMenuExpanded: Boolean = false,
-    val collaboratorPendingRemoval: Collaborator? = null
+    val collaboratorPendingRemoval: Collaborator? = null,
+    val navigationEvent: NoteEditSideEffect? = null
 )
 
 sealed interface NoteEditSideEffect {
