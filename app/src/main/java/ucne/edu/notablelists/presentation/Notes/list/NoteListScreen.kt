@@ -91,7 +91,7 @@ fun NotesListScreen(
         state.errorMessage?.let { snackbarHostState.showSnackbar(it) }
     }
 
-    if (state.showLogoutDialog) {
+    state.showLogoutDialog.takeIf { it }?.let {
         AlertDialog(
             onDismissRequest = { onEvent(NotesListEvent.LogoutDismissed) },
             icon = { Icon(Icons.Outlined.ExitToApp, contentDescription = null) },
@@ -112,7 +112,7 @@ fun NotesListScreen(
         )
     }
 
-    if (state.showDeleteSelectionDialog) {
+    state.showDeleteSelectionDialog.takeIf { it }?.let {
         AlertDialog(
             onDismissRequest = { onEvent(NotesListEvent.DeleteSelectedDismissed) },
             icon = { Icon(Icons.Default.Delete, contentDescription = null) },
@@ -135,18 +135,24 @@ fun NotesListScreen(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             val fabContainerColor by animateColorAsState(
-                if (state.isSelectionMode) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                targetValue = when {
+                    state.isSelectionMode -> MaterialTheme.colorScheme.errorContainer
+                    else -> MaterialTheme.colorScheme.primaryContainer
+                },
                 label = "fabColor"
             )
             val fabContentColor by animateColorAsState(
-                if (state.isSelectionMode) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer,
+                targetValue = when {
+                    state.isSelectionMode -> MaterialTheme.colorScheme.onErrorContainer
+                    else -> MaterialTheme.colorScheme.onPrimaryContainer
+                },
                 label = "fabContent"
             )
 
             ExtendedFloatingActionButton(
                 onClick = {
                     val currentTime = System.currentTimeMillis()
-                    if (currentTime - lastClickTime > 500) {
+                    (currentTime - lastClickTime > 500).takeIf { it }?.let {
                         lastClickTime = currentTime
                         onEvent(NotesListEvent.AddNoteClicked)
                     }
@@ -162,7 +168,10 @@ fun NotesListScreen(
                         transitionSpec = { scaleIn() togetherWith scaleOut() },
                         label = "fabIcon"
                     ) { isSelectionMode ->
-                        if (isSelectionMode) Icon(Icons.Default.Delete, "Eliminar") else Icon(Icons.Default.Add, "Crear")
+                        when {
+                            isSelectionMode -> Icon(Icons.Default.Delete, "Eliminar")
+                            else -> Icon(Icons.Default.Add, "Crear")
+                        }
                     }
                 },
                 text = { Text("Eliminar") }
@@ -208,7 +217,7 @@ fun NotesListScreen(
                     contentPadding = PaddingValues(bottom = 88.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    if (state.isLoading && state.notes.isEmpty()) {
+                    (state.isLoading && state.notes.isEmpty()).takeIf { it }?.let {
                         item {
                             Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
                                 CircularWavyProgressIndicator(modifier = Modifier.size(48.dp), color = MaterialTheme.colorScheme.primary)
@@ -221,7 +230,7 @@ fun NotesListScreen(
                             isSelectionMode = state.isSelectionMode,
                             onClick = {
                                 val currentTime = System.currentTimeMillis()
-                                if (currentTime - lastClickTime > 500) {
+                                (currentTime - lastClickTime > 500).takeIf { it }?.let {
                                     lastClickTime = currentTime
                                     onEvent(NotesListEvent.NoteClicked(noteUi.id))
                                 }
@@ -229,7 +238,7 @@ fun NotesListScreen(
                             onLongClick = { onEvent(NotesListEvent.NoteLongClicked(noteUi.id)) }
                         )
                     }
-                    if (!state.isLoading && state.notes.isEmpty()) {
+                    (!state.isLoading && state.notes.isEmpty()).takeIf { it }?.let {
                         item { EmptyStateMessage() }
                     }
                 }
@@ -248,12 +257,18 @@ fun CustomSearchBar(
     val focusManager = LocalFocusManager.current
 
     val cornerRadius by animateDpAsState(
-        targetValue = if (isFocused) 28.dp else 16.dp,
+        targetValue = when {
+            isFocused -> 28.dp
+            else -> 16.dp
+        },
         label = "searchBarShape"
     )
 
     val containerColor by animateColorAsState(
-        targetValue = if (isFocused) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
+        targetValue = when {
+            isFocused -> MaterialTheme.colorScheme.surfaceContainerHighest
+            else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        },
         label = "searchBarColor"
     )
 
@@ -306,17 +321,26 @@ fun UserAvatarMenu(
     val isLoggedIn = currentUser.isNotBlank()
 
     val cornerRadius by animateDpAsState(
-        targetValue = if (expanded) 16.dp else 50.dp,
+        targetValue = when {
+            expanded -> 16.dp
+            else -> 50.dp
+        },
         label = "avatarShape"
     )
 
     val containerColor by animateColorAsState(
-        targetValue = if (expanded || isLoggedIn) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+        targetValue = when {
+            expanded || isLoggedIn -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.surfaceContainerHighest
+        },
         label = "avatarColor"
     )
 
     val contentColor by animateColorAsState(
-        targetValue = if (expanded || isLoggedIn) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        targetValue = when {
+            expanded || isLoggedIn -> MaterialTheme.colorScheme.onPrimaryContainer
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        },
         label = "avatarContentColor"
     )
 
@@ -327,31 +351,37 @@ fun UserAvatarMenu(
             color = containerColor,
             contentColor = contentColor,
             modifier = Modifier.size(56.dp),
-            border = if (isLoggedIn || expanded) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            border = when {
+                !isLoggedIn && !expanded -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                else -> null
+            }
         ) {
             Box(contentAlignment = Alignment.Center) {
-                if (isLoggedIn) {
-                    Text(
-                        text = currentUser.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    if (pendingRequestCount > 0) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(4.dp)
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.error)
+                when {
+                    isLoggedIn -> {
+                        Text(
+                            text = currentUser.take(1).uppercase(),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        (pendingRequestCount > 0).takeIf { it }?.let {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
+                                    .size(10.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.error)
+                            )
+                        }
+                    }
+                    else -> {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Login",
+                            modifier = Modifier.size(28.dp)
                         )
                     }
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Login",
-                        modifier = Modifier.size(28.dp)
-                    )
                 }
             }
         }
@@ -365,72 +395,75 @@ fun UserAvatarMenu(
                     .background(MaterialTheme.colorScheme.surfaceContainer),
                 offset = androidx.compose.ui.unit.DpOffset(0.dp, 8.dp)
             ) {
-                if (isLoggedIn) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 16.dp)
-                    ) {
-                        Text(
-                            text = "Hola,",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = currentUser,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                when {
+                    isLoggedIn -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 16.dp)
+                        ) {
+                            Text(
+                                text = "Hola,",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = currentUser,
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
 
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
 
-                    DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Lista de Amigos")
-                                if (pendingRequestCount > 0) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Badge(containerColor = MaterialTheme.colorScheme.error) {
-                                        Text(pendingRequestCount.toString())
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Lista de Amigos")
+                                    (pendingRequestCount > 0).takeIf { it }?.let {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Badge(containerColor = MaterialTheme.colorScheme.error) {
+                                            Text(pendingRequestCount.toString())
+                                        }
                                     }
                                 }
-                            }
-                        },
-                        leadingIcon = {
-                            Icon(Icons.Outlined.Group, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        },
-                        onClick = {
-                            onFriendsClick()
-                            expanded = false
-                        },
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
-                    )
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.Group, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            },
+                            onClick = {
+                                onFriendsClick()
+                                expanded = false
+                            },
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                        )
 
-                    DropdownMenuItem(
-                        text = { Text("Cerrar Sesión") },
-                        leadingIcon = {
-                            Icon(Icons.Outlined.ExitToApp, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                        },
-                        onClick = {
-                            onLogoutClick()
-                            expanded = false
-                        },
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
-                    )
-                } else {
-                    DropdownMenuItem(
-                        text = { Text("Iniciar Sesión") },
-                        leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
-                        onClick = {
-                            onLoginClick()
-                            expanded = false
-                        },
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
-                    )
+                        DropdownMenuItem(
+                            text = { Text("Cerrar Sesión") },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.ExitToApp, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                            },
+                            onClick = {
+                                onLogoutClick()
+                                expanded = false
+                            },
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                        )
+                    }
+                    else -> {
+                        DropdownMenuItem(
+                            text = { Text("Iniciar Sesión") },
+                            leadingIcon = { Icon(Icons.Outlined.Person, contentDescription = null) },
+                            onClick = {
+                                onLoginClick()
+                                expanded = false
+                            },
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                        )
+                    }
                 }
             }
         }
@@ -453,9 +486,9 @@ fun FilterChipsSection(
                 selected = isSelected,
                 onClick = { onFilterSelected(item.filter) },
                 label = { Text(item.label) },
-                leadingIcon = if (isSelected) {
+                leadingIcon = isSelected.takeIf { it }?.let {
                     { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                } else null,
+                } ?: null,
                 shape = RoundedCornerShape(12.dp),
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
@@ -487,17 +520,26 @@ fun NoteItemCard(
     val (baseContainerColor, contentColor) = noteUi.style.getColors()
 
     val scale by animateFloatAsState(
-        targetValue = if (noteUi.isSelected) 0.95f else 1f,
+        targetValue = when {
+            noteUi.isSelected -> 0.95f
+            else -> 1f
+        },
         label = "scale"
     )
 
     val containerColor by animateColorAsState(
-        targetValue = if (noteUi.isSelected) MaterialTheme.colorScheme.surfaceVariant else baseContainerColor,
+        targetValue = when {
+            noteUi.isSelected -> MaterialTheme.colorScheme.surfaceVariant
+            else -> baseContainerColor
+        },
         label = "color"
     )
 
     val borderColor by animateColorAsState(
-        targetValue = if (noteUi.isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        targetValue = when {
+            noteUi.isSelected -> MaterialTheme.colorScheme.primary
+            else -> Color.Transparent
+        },
         label = "border"
     )
 
@@ -514,13 +556,16 @@ fun NoteItemCard(
             containerColor = containerColor
         ),
         border = BorderStroke(2.dp, borderColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (noteUi.isSelected) 0.dp else 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = when {
+            noteUi.isSelected -> 0.dp
+            else -> 2.dp
+        })
     ) {
         Box {
             Column(
                 modifier = Modifier.padding(20.dp)
             ) {
-                if (noteUi.isShared) {
+                noteUi.isShared.takeIf { it }?.let {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -552,7 +597,7 @@ fun NoteItemCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                if (noteUi.description.isNotBlank()) {
+                noteUi.description.isNotBlank().takeIf { it }?.let {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = noteUi.description,
@@ -593,9 +638,9 @@ fun NoteItemCard(
                         )
                     }
 
-                    if (!noteUi.reminder.isNullOrBlank()) {
+                    noteUi.reminder.isNullOrBlank().takeIf { !it }?.let {
                         MetaDataChip(
-                            text = noteUi.reminder,
+                            text = noteUi.reminder!!,
                             icon = Icons.Default.Alarm,
                             contentColor = contentColor,
                             containerColor = contentColor.copy(alpha = 0.1f)
@@ -604,7 +649,7 @@ fun NoteItemCard(
                 }
             }
 
-            if (noteUi.isSelected) {
+            noteUi.isSelected.takeIf { it }?.let {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
