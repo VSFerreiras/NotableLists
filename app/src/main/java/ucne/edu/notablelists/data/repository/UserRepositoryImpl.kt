@@ -55,7 +55,7 @@ class UserRepositoryImpl @Inject constructor(
                     localDataSource.upsert(synced)
                 }
                 is Resource.Error -> return Resource.Error("Falló sincronización")
-                else -> {}
+                is Resource.Loading -> continue
             }
         }
         return Resource.Success(Unit)
