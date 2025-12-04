@@ -16,6 +16,10 @@ class SharedNoteRepositoryImpl @Inject constructor(
     private val localDataSource: NoteDao
 ) : SharedNoteRepository {
 
+    companion object {
+        private const val UnknownErrorMessage = "Unknown error"
+    }
+
     override suspend fun shareNote(userId: Int, noteId: Int, friendId: Int): Resource<ShareResponseDto> {
         return try {
             Log.d("SHARE_NOTE", "Sharing note $noteId with friend $friendId")
@@ -43,7 +47,7 @@ class SharedNoteRepositoryImpl @Inject constructor(
                 Resource.Error(result.message ?: "Failed to share note")
             }
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Unknown error")
+            Resource.Error(e.message ?: UnknownErrorMessage)
         }
     }
 
@@ -69,7 +73,7 @@ class SharedNoteRepositoryImpl @Inject constructor(
         return try {
             remoteDataSource.getNotesSharedByMe(userId)
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Unknown error")
+            Resource.Error(e.message ?: UnknownErrorMessage)
         }
     }
 
@@ -96,7 +100,7 @@ class SharedNoteRepositoryImpl @Inject constructor(
                 Resource.Error(result.message ?: "Failed to update shared note")
             }
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Unknown error")
+            Resource.Error(e.message ?: UnknownErrorMessage)
         }
     }
 
@@ -115,7 +119,7 @@ class SharedNoteRepositoryImpl @Inject constructor(
                 Resource.Error(result.message ?: "Error obteniendo detalles de la nota compartida")
             }
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Unknown error")
+            Resource.Error(e.message ?: UnknownErrorMessage)
         }
     }
 
@@ -131,7 +135,7 @@ class SharedNoteRepositoryImpl @Inject constructor(
                 Resource.Success(isShared)
             }
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Unknown error")
+            Resource.Error(e.message ?: UnknownErrorMessage)
         }
     }
 
@@ -149,7 +153,7 @@ class SharedNoteRepositoryImpl @Inject constructor(
                 Resource.Error(error ?: "Failed to load shared notes")
             }
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Unknown error")
+            Resource.Error(e.message ?: UnknownErrorMessage)
         }
     }
 
@@ -194,7 +198,7 @@ class SharedNoteRepositoryImpl @Inject constructor(
             Log.d("SYNC_SHARED", "Sync completed successfully")
             Resource.Success(Unit)
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Unknown error")
+            Resource.Error(e.message ?: UnknownErrorMessage)
         }
     }
 
@@ -203,7 +207,7 @@ class SharedNoteRepositoryImpl @Inject constructor(
             val canShare = noteId != null && noteId > 0
             Resource.Success(canShare)
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Unknown error")
+            Resource.Error(e.message ?: UnknownErrorMessage)
         }
     }
 }
