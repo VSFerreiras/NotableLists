@@ -61,7 +61,8 @@ class UserViewModel @Inject constructor(
             is UserEvent.PasswordChanged -> passwordChanged(event.value)
             UserEvent.ShowSkipDialog -> _state.update { it.copy(showSkipDialog = true) }
             UserEvent.DismissSkipDialog -> _state.update { it.copy(showSkipDialog = false) }
-            UserEvent.NavigationHandled -> _state.update { it.copy(navigationEvent = null) }
+            UserEvent.NavigationHandled -> _state.update { it.copy(navigationTarget = null) }
+            else -> Unit
         }
     }
 
@@ -103,9 +104,9 @@ class UserViewModel @Inject constructor(
 
     private fun handleFooterClick() {
         if (_state.value.isLoginMode) {
-            _state.update { it.copy(navigationEvent = UserSideEffect.NavigateToRegister) }
+            _state.update { it.copy(navigationTarget = UserEvent.ToRegister) }
         } else {
-            _state.update { it.copy(navigationEvent = UserSideEffect.NavigateToLogin) }
+            _state.update { it.copy(navigationTarget = UserEvent.ToLogin) }
         }
     }
 
@@ -163,7 +164,7 @@ class UserViewModel @Inject constructor(
                                 password = "",
                                 currentUser = username,
                                 currentUserId = userId,
-                                navigationEvent = UserSideEffect.NavigateToProfile
+                                navigationTarget = UserEvent.ToProfile
                             )
                         }
                     }
@@ -219,7 +220,7 @@ class UserViewModel @Inject constructor(
                                 password = "",
                                 currentUser = username,
                                 currentUserId = userId,
-                                navigationEvent = UserSideEffect.NavigateToProfile
+                                navigationTarget = UserEvent.ToProfile
                             )
                         }
                     }
@@ -291,7 +292,7 @@ class UserViewModel @Inject constructor(
                     currentUser = "",
                     currentUserId = null,
                     isSessionChecked = true,
-                    navigationEvent = UserSideEffect.NavigateToLogin
+                    navigationTarget = UserEvent.ToLogin
                 )
             }
         }

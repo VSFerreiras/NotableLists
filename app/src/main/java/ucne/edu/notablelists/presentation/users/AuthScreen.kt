@@ -26,12 +26,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ucne.edu.notablelists.ui.theme.NotableListsTheme
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AuthScreen(
     onNavigateToLogin: () -> Unit,
@@ -40,6 +41,32 @@ fun AuthScreen(
     viewModel: UserViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(state.navigationTarget) {
+        state.navigationTarget?.let { target ->
+            when(target) {
+                UserEvent.ToProfile -> onNavigateToProfile()
+                UserEvent.ToLogin -> onNavigateToLogin()
+                UserEvent.ToRegister -> onNavigateToRegister()
+            }
+            viewModel.onEvent(UserEvent.NavigationHandled)
+        }
+    }
+
+    AuthContent(
+        state = state,
+        onEvent = viewModel::onEvent,
+        onNavigateToProfile = onNavigateToProfile
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun AuthContent(
+    state: UserState,
+    onEvent: (UserEvent) -> Unit,
+    onNavigateToProfile: () -> Unit
+) {
     val scrollState = rememberScrollState()
     var isProcessingClick by remember { mutableStateOf(false) }
     var lastClickTime by remember { mutableLongStateOf(0L) }
@@ -54,29 +81,18 @@ fun AuthScreen(
         }
     }
 
-    LaunchedEffect(state.navigationEvent) {
-        state.navigationEvent?.let { effect ->
-            when(effect) {
-                is UserSideEffect.NavigateToProfile -> onNavigateToProfile()
-                is UserSideEffect.NavigateToLogin -> onNavigateToLogin()
-                is UserSideEffect.NavigateToRegister -> onNavigateToRegister()
-            }
-            viewModel.onEvent(UserEvent.NavigationHandled)
-        }
-    }
-
     BackHandler(enabled = state.isLoading || isProcessingClick) {}
 
-    if (state.showSkipDialog) {
+    state.showSkipDialog.takeIf { it }?.let {
         AlertDialog(
-            onDismissRequest = { viewModel.onEvent(UserEvent.DismissSkipDialog) },
+            onDismissRequest = { onEvent(UserEvent.DismissSkipDialog) },
             icon = { Icon(Icons.Default.Warning, contentDescription = null) },
             title = { Text("¿Estás seguro?") },
             text = { Text(state.authSkipDialogText) },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.onEvent(UserEvent.DismissSkipDialog)
+                        onEvent(UserEvent.DismissSkipDialog)
                         onNavigateToProfile()
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -86,7 +102,7 @@ fun AuthScreen(
                 ) { Text("Omitir registro") }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.onEvent(UserEvent.DismissSkipDialog) }) { Text("Cancelar") }
+                TextButton(onClick = { onEvent(UserEvent.DismissSkipDialog) }) { Text("Cancelar") }
             }
         )
     }
@@ -164,7 +180,7 @@ fun AuthScreen(
 
                 AuthTextField(
                     value = state.username,
-                    onValueChange = { viewModel.onEvent(UserEvent.UserNameChanged(it)) },
+                    onValueChange = { onEvent(UserEvent.UserNameChanged(it)) },
                     label = "Usuario",
                     error = state.usernameError,
                     icon = { Icon(Icons.Default.AccountCircle, null) },
@@ -175,7 +191,7 @@ fun AuthScreen(
 
                 AuthTextField(
                     value = state.password,
-                    onValueChange = { viewModel.onEvent(UserEvent.PasswordChanged(it)) },
+                    onValueChange = { onEvent(UserEvent.PasswordChanged(it)) },
                     label = "Contraseña",
                     error = state.passwordError,
                     isPassword = true,
@@ -188,10 +204,10 @@ fun AuthScreen(
                     onClick = {
                         val currentTime = System.currentTimeMillis()
                         val canClick = currentTime - lastClickTime > 1000 && !isProcessingClick && !state.isLoading
-                        if (canClick) {
+                        canClick.takeIf { it }?.let {
                             lastClickTime = currentTime
                             isProcessingClick = true
-                            viewModel.onEvent(UserEvent.SubmitAuth)
+                            onEvent(UserEvent.SubmitAuth)
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -210,9 +226,9 @@ fun AuthScreen(
                         onClick = {
                             val currentTime = System.currentTimeMillis()
                             val canClick = currentTime - lastClickTime > 1000 && !isProcessingClick && !state.isLoading
-                            if (canClick) {
+                            canClick.takeIf { it }?.let {
                                 lastClickTime = currentTime
-                                viewModel.onEvent(UserEvent.AuthFooterClicked)
+                                onEvent(UserEvent.AuthFooterClicked)
                             }
                         },
                         enabled = !state.isLoading && !isProcessingClick
@@ -227,9 +243,9 @@ fun AuthScreen(
                     onClick = {
                         val currentTime = System.currentTimeMillis()
                         val canClick = currentTime - lastClickTime > 1000 && !isProcessingClick && !state.isLoading
-                        if (canClick) {
+                        canClick.takeIf { it }?.let {
                             lastClickTime = currentTime
-                            viewModel.onEvent(UserEvent.ShowSkipDialog)
+                            onEvent(UserEvent.ShowSkipDialog)
                         }
                     },
                     enabled = !state.isLoading && !isProcessingClick,
@@ -286,4 +302,20 @@ private fun AuthTextField(
         colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant, focusedBorderColor = MaterialTheme.colorScheme.primary),
         leadingIcon = icon
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AuthScreenPreview() {
+    NotableListsTheme {
+        AuthContent(
+            state = UserState(
+                username = "PreviewUser",
+                password = "password",
+                isLoading = false
+            ),
+            onEvent = {},
+            onNavigateToProfile = {}
+        )
+    }
 }
