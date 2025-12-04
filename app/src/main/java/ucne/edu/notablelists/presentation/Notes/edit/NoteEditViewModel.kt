@@ -55,8 +55,8 @@ class NoteEditViewModel @Inject constructor(
             val userId = getUserIdUseCase().first() ?: 0
             _state.update { it.copy(currentUserId = userId) }
             val noteId = savedStateHandle.get<String>("noteId")
-            if (!noteId.isNullOrBlank()) {
-                loadNote(noteId, userId)
+            (!noteId.isNullOrBlank()).takeIf { it }?.let {
+                loadNote(noteId!!, userId)
             }
         }
     }
@@ -109,7 +109,7 @@ class NoteEditViewModel @Inject constructor(
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch {
             delay(1500)
-            if (isDirty) saveNoteSilent()
+            isDirty.takeIf { it }?.let { saveNoteSilent() }
         }
     }
 
@@ -117,28 +117,31 @@ class NoteEditViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
             var note = getNoteUseCase(id)
-            if (note == null) {
+            (note == null).takeIf { it }?.let {
                 val remoteId = id.toIntOrNull()
-                if (remoteId != null) {
-                    val res = getSharedNoteDetailsUseCase(userId, remoteId)
-                    if (res is Resource.Success) note = res.data
+                (remoteId != null).takeIf { it }?.let {
+                    val res = getSharedNoteDetailsUseCase(userId, remoteId!!)
+                    (res is Resource.Success).takeIf { it }?.let { note = res.data }
                 }
             }
             note?.let { n ->
-                val ownerId = if (n.userId != null && n.userId != 0) n.userId else userId
+                val ownerId = n.userId.takeIf { it != null && it != 0 } ?: userId
                 val isOwner = ownerId == userId
-                _state.update {
-                    it.copy(
+                _state.update { currentState ->
+                    val tagShouldBeAdded = n.tag.isNotBlank() && !currentState.availableTags.contains(n.tag)
+                    val newAvailableTags = tagShouldBeAdded.takeIf { it }?.let { currentState.availableTags + n.tag } ?: currentState.availableTags
+
+                    currentState.copy(
                         id = n.id, remoteId = n.remoteId, title = n.title, description = n.description,
                         tag = n.tag, priority = n.priority, isFinished = n.isFinished,
                         reminder = n.reminder?.takeIf { r -> r.isNotBlank() },
                         checklist = parseChecklist(n.checklist),
-                        availableTags = if (n.tag.isNotBlank() && !it.availableTags.contains(n.tag)) it.availableTags + n.tag else it.availableTags,
+                        availableTags = newAvailableTags,
                         isOwner = isOwner, noteOwnerId = ownerId, isLoading = false
                     )
                 }
-                if (n.remoteId != null) {
-                    startPolling(userId, n.remoteId, isOwner)
+                n.remoteId?.let { rid ->
+                    startPolling(userId, rid, isOwner)
                     loadCollaborators()
                 }
             } ?: _state.update { it.copy(isLoading = false) }
@@ -147,10 +150,10 @@ class NoteEditViewModel @Inject constructor(
 
     private suspend fun saveNoteSilent() {
         val s = _state.value
-        if (s.title.isBlank() && s.description.isBlank() && s.checklist.isEmpty()) return
+        (s.title.isBlank() && s.description.isBlank() && s.checklist.isEmpty()).takeIf { it }?.let { return }
 
         val noteId = s.id ?: UUID.randomUUID().toString()
-        val ownerId = if (s.noteOwnerId != null && s.noteOwnerId != 0) s.noteOwnerId else s.currentUserId ?: 0
+        val ownerId = s.noteOwnerId.takeIf { it != null && it != 0 } ?: s.currentUserId ?: 0
 
         val isNewNote = s.remoteId == null
 
@@ -169,11 +172,11 @@ class NoteEditViewModel @Inject constructor(
         )
 
         upsertNoteUseCase(note, ownerId)
-        if (s.id == null) _state.update { it.copy(id = noteId) }
+        (s.id == null).takeIf { it }?.let { _state.update { it.copy(id = noteId) } }
 
-        if (isNewNote) {
+        (isNewNote).takeIf { it }?.let {
             val result = noteRepository.postNote(note, ownerId)
-            if (result is Resource.Success) {
+            (result is Resource.Success).takeIf { it }?.let {
                 result.data?.let { createdNote ->
                     val updatedNote = note.copy(
                         remoteId = createdNote.remoteId,
@@ -183,16 +186,14 @@ class NoteEditViewModel @Inject constructor(
                     _state.update { it.copy(remoteId = createdNote.remoteId) }
                 }
             }
-        } else {
-            putNoteUseCase(note, ownerId)
-        }
+        } ?: putNoteUseCase(note, ownerId)
 
         isDirty = false
     }
 
     private fun saveAndExit() {
         viewModelScope.launch {
-            if (isDirty) saveNoteSilent()
+            isDirty.takeIf { it }?.let { saveNoteSilent() }
             _state.update { it.copy(navigationEvent = NoteEditSideEffect.NavigateBack) }
         }
     }
@@ -202,10 +203,10 @@ class NoteEditViewModel @Inject constructor(
             val s = _state.value
             s.id?.let { id ->
                 cancelReminderUseCase(id)
-                if (s.isOwner) {
+                s.isOwner.takeIf { it }?.let {
                     s.remoteId?.let { deleteRemoteNoteUseCase(it) }
                     deleteNoteUseCase(id)
-                } else {
+                } ?: run {
                     s.remoteId?.let { leaveSharedNote(it) }
                     noteRepository.deleteLocalOnly(id)
                 }
@@ -217,7 +218,7 @@ class NoteEditViewModel @Inject constructor(
     private suspend fun leaveSharedNote(remoteId: Int) {
         val userId = _state.value.currentUserId ?: return
         val res = getAllSharedNotesUseCase(userId)
-        if (res is Resource.Success) {
+        (res is Resource.Success).takeIf { it }?.let {
             val share = res.data?.first?.find { it.noteId == remoteId }
             share?.let { updateSharedNoteStatusUseCase(userId, it.sharedNoteId) }
         }
@@ -228,7 +229,7 @@ class NoteEditViewModel @Inject constructor(
         val fmt = dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
         updateState { it.copy(reminder = fmt) }
         val id = _state.value.id ?: UUID.randomUUID().toString()
-        if (_state.value.id == null) _state.update { it.copy(id = id) }
+        (_state.value.id == null).takeIf { it }?.let { _state.update { it.copy(id = id) } }
         viewModelScope.launch { scheduleReminderUseCase(id, _state.value.title.ifBlank { "Nota" }, dt) }
     }
 
@@ -238,11 +239,11 @@ class NoteEditViewModel @Inject constructor(
     }
 
     private fun updateChecklistItem(idx: Int, txt: String) = updateState {
-        it.copy(checklist = it.checklist.mapIndexed { i, item -> if (i == idx) item.copy(text = txt) else item })
+        it.copy(checklist = it.checklist.mapIndexed { i, item -> (i == idx).takeIf { it }?.let { item.copy(text = txt) } ?: item })
     }
 
     private fun toggleChecklistItem(idx: Int) = updateState {
-        it.copy(checklist = it.checklist.mapIndexed { i, item -> if (i == idx) item.copy(isDone = !item.isDone) else item })
+        it.copy(checklist = it.checklist.mapIndexed { i, item -> (i == idx).takeIf { it }?.let { item.copy(isDone = !item.isDone) } ?: item })
     }
 
     private fun removeChecklistItem(idx: Int) = updateState {
@@ -250,28 +251,28 @@ class NoteEditViewModel @Inject constructor(
     }
 
     private fun createTag(tag: String) {
-        if (tag.isNotBlank() && !_state.value.availableTags.contains(tag)) {
+        (tag.isNotBlank() && !_state.value.availableTags.contains(tag)).takeIf { it }?.let {
             updateState { it.copy(tag = tag, availableTags = it.availableTags + tag, isTagSheetVisible = false) }
         }
     }
 
     private fun deleteTag(tag: String) {
-        _state.update { it.copy(availableTags = it.availableTags - tag, tag = if (it.tag == tag) "" else it.tag) }
+        _state.update { it.copy(availableTags = it.availableTags - tag, tag = (it.tag == tag).takeIf { it }?.let { "" } ?: it.tag) }
     }
 
     private fun checkShareRequirements() {
         val uid = _state.value.currentUserId
-        if (uid == null || uid == 0) {
+        ((uid == null) || (uid == 0)).takeIf { it }?.let {
             _state.update { it.copy(isLoginRequiredDialogVisible = true) }
             return
         }
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-            when(val res = getFriendsUseCase(uid)) {
+            when(val res = getFriendsUseCase(uid!!)) {
                 is Resource.Success -> {
                     val friends = res.data ?: emptyList()
-                    if (friends.isEmpty()) _state.update { it.copy(isLoading = false, isNoFriendsDialogVisible = true) }
-                    else _state.update { it.copy(isLoading = false, isShareSheetVisible = true, friends = friends.map { f -> ucne.edu.notablelists.domain.friends.model.Friend(f.userId, f.username) }) }
+                    friends.isEmpty().takeIf { it }?.let { _state.update { it.copy(isLoading = false, isNoFriendsDialogVisible = true) } }
+                        ?: _state.update { it.copy(isLoading = false, isShareSheetVisible = true, friends = friends.map { f -> ucne.edu.notablelists.domain.friends.model.Friend(f.userId, f.username) }) }
                 }
                 else -> _state.update { it.copy(isLoading = false, errorMessage = res.message) }
             }
@@ -283,17 +284,17 @@ class NoteEditViewModel @Inject constructor(
             _state.value.remoteId?.let { rid ->
                 _state.update { it.copy(isShareSheetVisible = false, isLoading = true) }
                 val res = shareNoteUseCase(_state.value.currentUserId ?: 0, rid, friendId)
-                if (res is Resource.Success) {
+                (res is Resource.Success).takeIf { it }?.let {
                     _state.update { it.copy(isLoading = false, successMessage = "Compartido exitosamente") }
                     loadCollaborators()
-                } else _state.update { it.copy(isLoading = false, errorMessage = res.message) }
+                } ?: _state.update { it.copy(isLoading = false, errorMessage = res.message) }
             } ?: _state.update { it.copy(errorMessage = "Sincroniza la nota antes de compartir") }
         }
     }
 
     private fun toggleCollaboratorMenu() {
         _state.update { it.copy(isCollaboratorMenuExpanded = !it.isCollaboratorMenuExpanded) }
-        if (_state.value.isCollaboratorMenuExpanded) loadCollaborators()
+        _state.value.isCollaboratorMenuExpanded.takeIf { it }?.let { loadCollaborators() }
     }
 
     private fun loadCollaborators() {
@@ -301,14 +302,14 @@ class NoteEditViewModel @Inject constructor(
             val uid = _state.value.currentUserId ?: return@launch
             val rid = _state.value.remoteId ?: return@launch
             val res = getAllSharedNotesUseCase(uid)
-            if (res is Resource.Success) {
+            (res is Resource.Success).takeIf { it }?.let {
                 val list = mutableListOf<Collaborator>()
-                if (_state.value.isOwner) {
+                _state.value.isOwner.takeIf { it }?.let {
                     list.add(Collaborator(uid, "Yo (Dueño)", true))
                     res.data?.second?.filter { it.noteId == rid && it.status == "active" }?.forEach {
                         list.add(Collaborator(it.targetUserId, it.targetUsername ?: "Usuario", false, it.sharedNoteId))
                     }
-                } else {
+                } ?: run {
                     res.data?.first?.find { it.noteId == rid }?.let {
                         list.add(Collaborator(it.ownerUserId, it.ownerUsername ?: "Dueño", true))
                         list.add(Collaborator(uid, "Yo", false, it.sharedNoteId))
@@ -337,9 +338,9 @@ class NoteEditViewModel @Inject constructor(
         pollingJob = viewModelScope.launch {
             while (true) {
                 delay(3000)
-                if (!isDirty) {
+                (!isDirty).takeIf { it }?.let {
                     val res = if (owner) getRemoteUserNoteUseCase(uid, rid) else getSharedNoteDetailsUseCase(uid, rid)
-                    if (res is Resource.Success) {
+                    (res is Resource.Success).takeIf { it }?.let {
                         res.data?.let { r ->
                             _state.update { it.copy(title = r.title, description = r.description, tag = r.tag, priority = r.priority, isFinished = r.isFinished, checklist = parseChecklist(r.checklist)) }
                         }
@@ -350,6 +351,6 @@ class NoteEditViewModel @Inject constructor(
         }
     }
 
-    private fun parseChecklist(s: String?) = s?.split("\n")?.mapNotNull { val p = it.split("|", limit=2); if(p.size==2) ChecklistItem(p[1], p[0]=="1") else null } ?: emptyList()
-    private fun serializeChecklist(l: List<ChecklistItem>) = if (l.isEmpty()) null else l.joinToString("\n") { "${if (it.isDone) "1" else "0"}|${it.text}" }
+    private fun parseChecklist(s: String?) = s?.split("\n")?.mapNotNull { val p = it.split("|", limit=2); (p.size==2).takeIf { it }?.let { ChecklistItem(p[1], p[0]=="1") } } ?: emptyList()
+    private fun serializeChecklist(l: List<ChecklistItem>) = l.isEmpty().takeIf { it }?.let { null } ?: l.joinToString("\n") { "${if (it.isDone) "1" else "0"}|${it.text}" }
 }
