@@ -307,11 +307,11 @@ class NoteEditViewModel @Inject constructor(
                 _state.value.isOwner.takeIf { it }?.let {
                     list.add(Collaborator(uid, "Yo (Dueño)", true))
                     res.data?.second?.filter { it.noteId == rid && it.status == "active" }?.forEach {
-                        list.add(Collaborator(it.targetUserId, it.targetUsername ?: "Usuario", false, it.sharedNoteId))
+                        list.add(Collaborator(it.targetUserId, it.targetUsername, false, it.sharedNoteId))
                     }
                 } ?: run {
                     res.data?.first?.find { it.noteId == rid }?.let {
-                        list.add(Collaborator(it.ownerUserId, it.ownerUsername ?: "Dueño", true))
+                        list.add(Collaborator(it.ownerUserId, it.ownerUsername, true))
                         list.add(Collaborator(uid, "Yo", false, it.sharedNoteId))
                     }
                 }
