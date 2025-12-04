@@ -255,7 +255,6 @@ val unspecified_scheme = ColorFamily(
 @Composable
 fun NotableListsTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
