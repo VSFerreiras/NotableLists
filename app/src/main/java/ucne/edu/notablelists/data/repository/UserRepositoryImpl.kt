@@ -15,12 +15,16 @@ class UserRepositoryImpl @Inject constructor(
     private val remoteDataSource: UserRemoteDataSource
 ) : UserRepository {
 
+    companion object {
+        private const val NoRemoteIdMessage = "No remoteId"
+    }
+
     override suspend fun getUser(id: String): User? {
         return localDataSource.getUser(id)?.toDomain()
     }
 
     override suspend fun upsertUser(user: User): Resource<Unit> {
-        val remoteId = user.remoteId ?: return Resource.Error("No remoteId")
+        val remoteId = user.remoteId ?: return Resource.Error(NoRemoteIdMessage)
         val request = UserRequestDto(user.username, user.password)
         return when (val result = remoteDataSource.updateUser(remoteId, request)) {
             is Resource.Success -> {
@@ -34,7 +38,7 @@ class UserRepositoryImpl @Inject constructor(
 
     override suspend fun deleteUser(id: String): Resource<Unit> {
         val user = localDataSource.getUser(id) ?: return Resource.Error("No encontrado")
-        val remoteId = user.remoteId ?: return Resource.Error("No remoteId")
+        val remoteId = user.remoteId ?: return Resource.Error(NoRemoteIdMessage)
         return when (val result = remoteDataSource.deleteUser(remoteId)) {
             is Resource.Success -> {
                 localDataSource.delete(id)
@@ -76,7 +80,7 @@ class UserRepositoryImpl @Inject constructor(
     }
 
     override suspend fun putUser(user: User): User {
-        val remoteId = user.remoteId ?: throw Exception("No remoteId")
+        val remoteId = user.remoteId ?: throw Exception(NoRemoteIdMessage)
         val request = UserRequestDto(user.username, user.password)
         val result = remoteDataSource.updateUser(remoteId, request)
 
