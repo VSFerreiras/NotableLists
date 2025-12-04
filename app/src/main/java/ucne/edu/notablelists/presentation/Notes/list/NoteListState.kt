@@ -10,7 +10,8 @@ data class NotesListState(
     val showLogoutDialog: Boolean = false,
     val selectedNoteIds: Set<String> = emptySet(),
     val showDeleteSelectionDialog: Boolean = false,
-    val pendingRequestCount: Int = 0
+    val pendingRequestCount: Int = 0,
+    val navigationEvent: NotesListSideEffect? = null
 ) {
     val isSelectionMode: Boolean get() = selectedNoteIds.isNotEmpty()
 }
