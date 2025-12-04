@@ -10,4 +10,5 @@ sealed interface UserEvent {
     data class PasswordChanged(val value: String) : UserEvent
     data object ShowSkipDialog : UserEvent
     data object DismissSkipDialog : UserEvent
+    data object NavigationHandled : UserEvent
 }
