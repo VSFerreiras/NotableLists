@@ -351,9 +351,8 @@ fun UserAvatarMenu(
             color = containerColor,
             contentColor = contentColor,
             modifier = Modifier.size(56.dp),
-            border = when {
-                !isLoggedIn && !expanded -> BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                else -> null
+            border = (isLoggedIn || expanded).takeIf { !it }?.let {
+                BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
             }
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -520,26 +519,17 @@ fun NoteItemCard(
     val (baseContainerColor, contentColor) = noteUi.style.getColors()
 
     val scale by animateFloatAsState(
-        targetValue = when {
-            noteUi.isSelected -> 0.95f
-            else -> 1f
-        },
+        targetValue = noteUi.isSelected.takeIf { it }?.let { 0.95f } ?: 1f,
         label = "scale"
     )
 
     val containerColor by animateColorAsState(
-        targetValue = when {
-            noteUi.isSelected -> MaterialTheme.colorScheme.surfaceVariant
-            else -> baseContainerColor
-        },
+        targetValue = noteUi.isSelected.takeIf { it }?.let { MaterialTheme.colorScheme.surfaceVariant } ?: baseContainerColor,
         label = "color"
     )
 
     val borderColor by animateColorAsState(
-        targetValue = when {
-            noteUi.isSelected -> MaterialTheme.colorScheme.primary
-            else -> Color.Transparent
-        },
+        targetValue = noteUi.isSelected.takeIf { it }?.let { MaterialTheme.colorScheme.primary } ?: Color.Transparent,
         label = "border"
     )
 
@@ -556,10 +546,7 @@ fun NoteItemCard(
             containerColor = containerColor
         ),
         border = BorderStroke(2.dp, borderColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = when {
-            noteUi.isSelected -> 0.dp
-            else -> 2.dp
-        })
+        elevation = CardDefaults.cardElevation(defaultElevation = noteUi.isSelected.takeIf { it }?.let { 0.dp } ?: 2.dp)
     ) {
         Box {
             Column(
