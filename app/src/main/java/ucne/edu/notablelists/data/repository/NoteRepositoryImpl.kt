@@ -1,6 +1,5 @@
 package ucne.edu.notablelists.data.repository
 
-import android.util.Log
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import ucne.edu.notablelists.data.local.Notes.NoteDao

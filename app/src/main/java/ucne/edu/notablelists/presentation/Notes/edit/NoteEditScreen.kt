@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -71,15 +70,15 @@ fun NoteEditScreen(
         onResult = {}
     )
 
-    val safeOnBack = {
-        if (!isProcessingClick && !state.isLoading) {
+    val safeOnBack: () -> Unit = {
+        (!isProcessingClick && !state.isLoading).takeIf { it }?.let {
             isProcessingClick = true
             viewModel.onEvent(NoteEditEvent.BackClicked)
         }
     }
 
     LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU).takeIf { it }?.let {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
@@ -111,10 +110,10 @@ fun NoteEditScreen(
         safeOnBack()
     }
 
-    if (state.isDeleteDialogVisible) {
+    state.isDeleteDialogVisible.takeIf { it }?.let {
         AlertDialog(
             onDismissRequest = { viewModel.onEvent(NoteEditEvent.DialogDismissed) },
-            title = { Text(if (state.isOwner) "Eliminar nota" else "Salir de nota") },
+            title = { Text((state.isOwner).takeIf { it }?.let { "Eliminar nota" } ?: "Salir de nota") },
             text = { Text("¿Estás seguro de que deseas continuar?") },
             confirmButton = {
                 TextButton(
@@ -128,11 +127,11 @@ fun NoteEditScreen(
         )
     }
 
-    if (state.collaboratorPendingRemoval != null) {
+    state.collaboratorPendingRemoval?.let { collaborator ->
         AlertDialog(
             onDismissRequest = { viewModel.onEvent(NoteEditEvent.DialogDismissed) },
             title = { Text("Eliminar acceso") },
-            text = { Text("¿Eliminar a ${state.collaboratorPendingRemoval?.username}?") },
+            text = { Text("¿Eliminar a ${collaborator.username}?") },
             confirmButton = {
                 TextButton(
                     onClick = { viewModel.onEvent(NoteEditEvent.RemoveCollaboratorConfirmed) },
@@ -145,7 +144,7 @@ fun NoteEditScreen(
         )
     }
 
-    if (state.isLoginRequiredDialogVisible) {
+    state.isLoginRequiredDialogVisible.takeIf { it }?.let {
         AlertDialog(
             onDismissRequest = { viewModel.onEvent(NoteEditEvent.DialogDismissed) },
             title = { Text("Iniciar Sesión") },
@@ -159,7 +158,7 @@ fun NoteEditScreen(
         )
     }
 
-    if (state.isNoFriendsDialogVisible) {
+    state.isNoFriendsDialogVisible.takeIf { it }?.let {
         AlertDialog(
             onDismissRequest = { viewModel.onEvent(NoteEditEvent.DialogDismissed) },
             title = { Text("¡Necesitas Amigos!") },
@@ -173,7 +172,7 @@ fun NoteEditScreen(
         )
     }
 
-    if (state.isShareSheetVisible) {
+    state.isShareSheetVisible.takeIf { it }?.let {
         ModalBottomSheet(onDismissRequest = { viewModel.onEvent(NoteEditEvent.DialogDismissed) }) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                 Text("Compartir con...", style = MaterialTheme.typography.titleLarge)
@@ -191,7 +190,7 @@ fun NoteEditScreen(
         }
     }
 
-    if (showDatePicker) {
+    showDatePicker.takeIf { it }?.let {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
@@ -206,13 +205,13 @@ fun NoteEditScreen(
         ) { DatePicker(state = datePickerState) }
     }
 
-    if (showTimePicker) {
+    showTimePicker.takeIf { it }?.let {
         DateTimePickerDialog(
             onDismissRequest = { showTimePicker = false },
             onConfirm = {
                 val date = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
                 viewModel.onEvent(NoteEditEvent.ReminderSet(date, timePickerState.hour, timePickerState.minute))
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU).takeIf { it }?.let {
                     permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
                 showTimePicker = false
@@ -220,7 +219,7 @@ fun NoteEditScreen(
         ) { TimePicker(state = timePickerState) }
     }
 
-    if (state.isTagSheetVisible) {
+    state.isTagSheetVisible.takeIf { it }?.let {
         ModalBottomSheet(onDismissRequest = { viewModel.onEvent(NoteEditEvent.TagSelected(state.tag)) }) {
             TagSelectionSheetContent(
                 availableTags = state.availableTags,
@@ -246,7 +245,7 @@ fun NoteEditScreen(
                     }
                 },
                 actions = {
-                    if (state.remoteId != null) {
+                    state.remoteId?.let { remoteId ->
                         Box {
                             IconButton(onClick = { viewModel.onEvent(NoteEditEvent.CollaboratorMenuClicked) }) {
                                 Icon(Icons.Outlined.Group, "Collaborators", tint = MaterialTheme.colorScheme.primary)
@@ -259,15 +258,15 @@ fun NoteEditScreen(
                                 Text("En esta nota", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(16.dp))
                                 state.collaborators.forEach { collaborator ->
                                     DropdownMenuItem(
-                                        text = { Text(collaborator.username, fontWeight = if (collaborator.isOwner) FontWeight.Bold else FontWeight.Normal) },
+                                        text = { Text(collaborator.username, fontWeight = collaborator.isOwner.takeIf { it }?.let { FontWeight.Bold } ?: FontWeight.Normal) },
                                         leadingIcon = {
-                                            Surface(shape = CircleShape, color = if (collaborator.isOwner) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(32.dp)) {
+                                            Surface(shape = CircleShape, color = collaborator.isOwner.takeIf { it }?.let { MaterialTheme.colorScheme.primaryContainer } ?: MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(32.dp)) {
                                                 Box(contentAlignment = Alignment.Center) { Text(collaborator.username.take(1).uppercase()) }
                                             }
                                         },
                                         onClick = {},
                                         trailingIcon = {
-                                            if (state.isOwner && !collaborator.isOwner) {
+                                            (state.isOwner && !collaborator.isOwner).takeIf { it }?.let {
                                                 IconButton(onClick = { viewModel.onEvent(NoteEditEvent.RemoveCollaboratorRequested(collaborator)) }) {
                                                     Icon(Icons.Default.Close, "Remove", tint = MaterialTheme.colorScheme.error)
                                                 }
@@ -283,7 +282,7 @@ fun NoteEditScreen(
             )
         },
         floatingActionButton = {
-            if (!state.isLoading) {
+            (!state.isLoading).takeIf { it }?.let {
                 FabMenu(
                     expanded = isFabMenuExpanded,
                     onToggle = { isFabMenuExpanded = !isFabMenuExpanded },
@@ -321,7 +320,7 @@ fun NoteEditScreen(
                     onRemoveTag = { viewModel.onEvent(NoteEditEvent.TagChanged("")) }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                if (state.checklist.isNotEmpty()) {
+                state.checklist.isNotEmpty().takeIf { it }?.let {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         state.checklist.forEachIndexed { index, item ->
                             ChecklistItemRow(
@@ -349,7 +348,7 @@ fun NoteEditScreen(
                 Spacer(modifier = Modifier.height(100.dp))
             }
 
-            if (state.isLoading || isProcessingClick) {
+            (state.isLoading || isProcessingClick).takeIf { it }?.let {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -361,7 +360,9 @@ fun NoteEditScreen(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (state.isLoading) CircularWavyProgressIndicator()
+                    state.isLoading.takeIf { it }?.let {
+                        CircularWavyProgressIndicator()
+                    }
                 }
             }
         }
@@ -426,7 +427,7 @@ fun TagSelectionSheetContent(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = {
-                    if (newTagText.isNotBlank()) {
+                    newTagText.isNotBlank().takeIf { it }?.let {
                         onTagCreated(newTagText)
                         newTagText = ""
                         keyboardController?.hide()
@@ -434,7 +435,7 @@ fun TagSelectionSheetContent(
                 })
             )
             IconButton(onClick = {
-                if (newTagText.isNotBlank()) {
+                newTagText.isNotBlank().takeIf { it }?.let {
                     onTagCreated(newTagText)
                     newTagText = ""
                     keyboardController?.hide()
@@ -482,12 +483,12 @@ fun FlowRowChips(
     onRemoveReminder: () -> Unit,
     onRemoveTag: () -> Unit
 ) {
-    if (state.priority > 0 || state.tag.isNotBlank() || !state.reminder.isNullOrBlank()) {
+    (state.priority > 0 || state.tag.isNotBlank() || !state.reminder.isNullOrBlank()).takeIf { it }?.let {
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (state.priority > 0) {
+            (state.priority > 0).takeIf { it }?.let {
                 val priorityText = when (state.priority) {
                     1 -> "Prioridad media"
                     2 -> "Prioridad alta"
@@ -495,11 +496,11 @@ fun FlowRowChips(
                 }
                 ChipInfo(text = priorityText, icon = Icons.Default.Flag)
             }
-            if (state.tag.isNotBlank()) {
+            state.tag.isNotBlank().takeIf { it }?.let {
                 ChipInfo(text = state.tag, icon = Icons.Default.Label, onDelete = onRemoveTag)
             }
-            if (!state.reminder.isNullOrBlank()) {
-                ChipInfo(text = state.reminder, icon = Icons.Default.Alarm, onDelete = onRemoveReminder)
+            (!state.reminder.isNullOrBlank()).takeIf { it }?.let {
+                ChipInfo(text = state.reminder!!, icon = Icons.Default.Alarm, onDelete = onRemoveReminder)
             }
         }
     }
@@ -515,13 +516,15 @@ fun ChecklistItemRow(
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        if (item.text.isEmpty()) focusRequester.requestFocus()
+        item.text.isEmpty().takeIf { it }?.let {
+            focusRequester.requestFocus()
+        }
     }
 
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Checkbox(checked = item.isDone, onCheckedChange = { onToggle() })
         Box(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-            if (item.text.isEmpty()) {
+            item.text.isEmpty().takeIf { it }?.let {
                 Text(
                     text = "Elemento de lista",
                     style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
@@ -530,9 +533,9 @@ fun ChecklistItemRow(
             BasicTextField(
                 value = item.text,
                 onValueChange = onTextChange,
-                textStyle = if (item.isDone)
+                textStyle = item.isDone.takeIf { it }?.let {
                     MaterialTheme.typography.bodyLarge.copy(textDecoration = TextDecoration.LineThrough, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-                else MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                } ?: MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 singleLine = false,
                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester)
@@ -556,7 +559,7 @@ fun FabMenu(
     onDeleteClick: () -> Unit,
     isOwner: Boolean
 ) {
-    val rotation by animateFloatAsState(targetValue = if (expanded) 135f else 0f, label = "fab_rotation")
+    val rotation by animateFloatAsState(targetValue = (expanded).takeIf { it }?.let { 135f } ?: 0f, label = "fab_rotation")
 
     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         AnimatedVisibility(
@@ -571,11 +574,9 @@ fun FabMenu(
                 FabMenuItem(Icons.Default.Share, "Compartir", onShareClick)
                 FabMenuItem(Icons.Default.Checklist, "Lista", onChecklistClick)
 
-                if (isOwner) {
+                isOwner.takeIf { it }?.let {
                     FabMenuItem(Icons.Default.Delete, "Eliminar", onDeleteClick, MaterialTheme.colorScheme.errorContainer)
-                } else {
-                    FabMenuItem(Icons.AutoMirrored.Filled.ExitToApp, "Salir", onDeleteClick, MaterialTheme.colorScheme.errorContainer)
-                }
+                } ?: FabMenuItem(Icons.AutoMirrored.Filled.ExitToApp, "Salir", onDeleteClick, MaterialTheme.colorScheme.errorContainer)
             }
         }
         FloatingActionButton(
@@ -623,7 +624,7 @@ fun TransparentHintTextField(
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             modifier = Modifier.fillMaxWidth()
         )
-        if (text.isEmpty()) {
+        text.isEmpty().takeIf { it }?.let {
             Text(text = hint, style = textStyle, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
         }
     }
@@ -643,7 +644,7 @@ fun ChipInfo(
         ) {
             Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(text = text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (onDelete != null) {
+            onDelete?.let {
                 Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(12.dp))
             }
         }

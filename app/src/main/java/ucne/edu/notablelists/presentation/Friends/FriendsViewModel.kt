@@ -12,11 +12,6 @@ import kotlinx.coroutines.launch
 import ucne.edu.notablelists.data.mappers.toDomain
 import ucne.edu.notablelists.data.mappers.toUserDomain
 import ucne.edu.notablelists.data.remote.Resource
-import ucne.edu.notablelists.data.remote.dto.FriendDto
-import ucne.edu.notablelists.data.remote.dto.PendingRequestDto
-import ucne.edu.notablelists.data.remote.dto.UserResponseDto
-import ucne.edu.notablelists.domain.friends.model.Friend
-import ucne.edu.notablelists.domain.friends.model.PendingRequest
 import ucne.edu.notablelists.domain.friends.usecase.AcceptFriendRequestUseCase
 import ucne.edu.notablelists.domain.friends.usecase.DeclineFriendRequestUseCase
 import ucne.edu.notablelists.domain.friends.usecase.GetFriendsUseCase
@@ -25,7 +20,6 @@ import ucne.edu.notablelists.domain.friends.usecase.RemoveFriendUseCase
 import ucne.edu.notablelists.domain.friends.usecase.SearchUserUseCase
 import ucne.edu.notablelists.domain.friends.usecase.SendFriendRequestUseCase
 import ucne.edu.notablelists.domain.session.usecase.GetUserIdUseCase
-import ucne.edu.notablelists.domain.users.model.User
 import javax.inject.Inject
 
 @HiltViewModel
