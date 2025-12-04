@@ -233,6 +233,7 @@ class UserViewModel @Inject constructor(
                         }
                     }
                     is Resource.Loading -> {
+                        _state.update { it.copy(isLoading = true) }
                     }
                 }
             } catch (e: Exception) {
