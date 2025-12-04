@@ -165,7 +165,9 @@ class FriendsViewModel @Inject constructor(
                         it.copy(errorMessage = "Ya enviaste una solicitud a este usuario")
                     }
                 }
-                is Resource.Loading -> {}
+                is Resource.Loading -> {
+                    _state.update { it.copy(isLoading = true) }
+                }
             }
         }
     }
@@ -182,7 +184,9 @@ class FriendsViewModel @Inject constructor(
                 is Resource.Error -> {
                     _state.update { it.copy(errorMessage = result.message) }
                 }
-                is Resource.Loading -> {}
+                is Resource.Loading -> {
+                    _state.update { it.copy(isLoading = true) }
+                }
             }
         }
     }
@@ -202,7 +206,9 @@ class FriendsViewModel @Inject constructor(
                 is Resource.Error -> {
                     _state.update { it.copy(errorMessage = result.message) }
                 }
-                is Resource.Loading -> {}
+                is Resource.Loading -> {
+                    _state.update { it.copy(isLoading = true) }
+                }
             }
         }
     }
